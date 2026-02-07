@@ -1,0 +1,2687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC Signal Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e17; --card: #111827; --card2: #0d1320; --border: #1e293b; --border2: #334155;
+  --text: #e2e8f0; --dim: #94a3b8; --muted: #64748b; --dark: #475569;
+  --bull: #22c55e; --bull-dim: #166534; --bull-bg: rgba(34,197,94,0.08);
+  --bear: #ef4444; --bear-dim: #991b1b; --bear-bg: rgba(239,68,68,0.08);
+  --accent: #3b82f6; --accent-dim: #1d4ed8; --accent-bg: rgba(59,130,246,0.08);
+  --warn: #f59e0b; --warn-bg: rgba(245,158,11,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.5;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+h1,h2,h3,h4{font-family:'Outfit',sans-serif;color:var(--text);margin:0;}
+
+/* Layout */
+.header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100;}
+.main-grid{display:grid;grid-template-columns:1fr;gap:12px;padding:12px;}
+@media(min-width:1100px){.main-grid{grid-template-columns:3fr 2fr;}}
+.bottom-panel{grid-column:1/-1;}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.card-head{background:var(--card2);padding:8px 14px;font-family:'Outfit',sans-serif;font-weight:600;font-size:15px;color:var(--text);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;}
+.card-head:hover{background:var(--border);}
+.card-body{padding:10px 14px;}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;padding:4px 8px;border-bottom:1px solid var(--border);}
+td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;white-space:nowrap;}
+
+/* Colors */
+.bull{color:var(--bull);}.bear{color:var(--bear);}.warn{color:var(--warn);}.accent{color:var(--accent);}.muted{color:var(--muted);}.text{color:var(--text);}
+.bull-bg{background:var(--bull-bg);}.bear-bg{background:var(--bear-bg);}.warn-bg{background:var(--warn-bg);}
+
+/* Badges */
+.badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;}
+.badge-bull{background:var(--bull-bg);color:var(--bull);border:1px solid var(--bull-dim);}
+.badge-bear{background:var(--bear-bg);color:var(--bear);border:1px solid var(--bear-dim);}
+.badge-neutral{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-dim);}
+.badge-warn{background:var(--warn-bg);color:var(--warn);border:1px solid rgba(245,158,11,0.3);}
+
+/* Sub-headings */
+.sub-h{color:var(--accent);font-size:12px;font-weight:600;padding:8px 0 3px;text-transform:uppercase;letter-spacing:0.7px;}
+
+/* Buttons */
+.btn{background:var(--border);border:1px solid var(--border2);color:var(--dim);padding:6px 14px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;transition:all 0.15s;}
+.btn:hover{background:var(--border2);color:var(--text);}
+.btn-accent{background:var(--accent-dim);border-color:var(--accent);color:#fff;}
+.btn-accent:hover{background:var(--accent);}
+.btn-bull{background:var(--bull-dim);border-color:var(--bull);color:#fff;}
+.btn-bear{background:var(--bear-dim);border-color:var(--bear);color:#fff;}
+
+/* Inputs */
+.input{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:4px;font-family:inherit;font-size:13px;width:110px;text-align:right;}
+.input:focus{outline:none;border-color:var(--accent);}
+
+/* Confluence meter */
+.meter-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;position:relative;}
+.meter-fill{height:100%;border-radius:3px;transition:width 0.5s ease;}
+
+/* Trade setup glow */
+.glow-bull{box-shadow:0 0 25px rgba(34,197,94,0.15),0 0 50px rgba(34,197,94,0.05);border-color:var(--bull-dim)!important;}
+.glow-bear{box-shadow:0 0 25px rgba(239,68,68,0.15),0 0 50px rgba(239,68,68,0.05);border-color:var(--bear-dim)!important;}
+
+/* Session indicator */
+.session-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;}
+
+/* Tabs */
+.tabs{display:flex;gap:2px;padding:4px;background:var(--card2);border-radius:6px;margin-bottom:8px;}
+.tab{padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:all 0.15s;text-align:center;flex:1;}
+.tab:hover{color:var(--dim);background:rgba(59,130,246,0.05);}
+.tab.active{background:var(--accent-dim);color:#fff;}
+
+/* Tooltip */
+.tip{position:relative;cursor:help;border-bottom:1px dotted var(--muted);}
+.tip .tip-text{display:none;position:absolute;bottom:120%;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border2);color:var(--dim);padding:6px 10px;border-radius:6px;font-size:12px;white-space:normal;width:220px;z-index:50;line-height:1.4;box-shadow:0 4px 12px rgba(0,0,0,0.4);}
+.tip:hover .tip-text{display:block;}
+
+/* Info tip (?) icon */
+.info-tip{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--border);color:var(--muted);font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;cursor:help;margin-left:5px;flex-shrink:0;transition:all 0.15s;line-height:1;vertical-align:middle;user-select:none;}
+.info-tip:hover{background:var(--accent-dim);color:#fff;}
+
+/* Fixed-position bubble rendered via portal */
+.info-bubble-fixed{position:fixed;background:var(--card2);border:1px solid var(--border2);color:var(--dim);padding:10px 12px;border-radius:8px;font-size:12px;font-weight:400;white-space:normal;width:280px;z-index:9999;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,0.6);pointer-events:none;font-family:'JetBrains Mono',monospace;}
+.info-bubble-fixed::after{content:'';position:absolute;left:var(--arrow,50%);transform:translateX(-50%);border:6px solid transparent;}
+.info-bubble-fixed.above::after{top:100%;border-top-color:var(--border2);}
+.info-bubble-fixed.below::after{bottom:100%;border-bottom-color:var(--border2);}
+.info-bubble-fixed.positioning{opacity:0;}
+
+/* RR bar */
+.rr-bar{display:flex;height:22px;border-radius:4px;overflow:hidden;font-size:11px;font-weight:600;line-height:22px;text-align:center;}
+.rr-sl{background:var(--bear-dim);color:var(--bear);}
+.rr-tp{background:var(--bull-dim);color:var(--bull);}
+
+/* Animations */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.pulse{animation:pulse 1.5s infinite;}
+.fade-in{animation:fadeIn .3s ease-out;}
+
+/* Loading */
+.loading{text-align:center;padding:40px;color:var(--muted);}
+.error-box{color:var(--bear);background:var(--bear-bg);border:1px solid var(--bear-dim);padding:10px 16px;margin:12px;border-radius:8px;font-size:13px;}
+
+/* Journal */
+.journal-stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+.journal-stat{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;min-width:100px;text-align:center;}
+.journal-stat .val{font-size:22px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;}
+.journal-stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+.outcome-btn{padding:3px 10px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid;transition:all .15s;font-family:inherit;}
+.outcome-btn:hover{filter:brightness(1.3);}
+.outcome-pending{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-dim);}
+.outcome-win{background:var(--bull-bg);color:var(--bull);border-color:var(--bull-dim);}
+.outcome-loss{background:var(--bear-bg);color:var(--bear);border-color:var(--bear-dim);}
+.journal-import{display:none;}
+.journal-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+
+/* Footer */
+.footer{background:var(--card);border-top:1px solid var(--border);padding:12px 20px;font-size:12px;color:var(--muted);line-height:1.6;}
+
+/* Responsive */
+@media(max-width:768px){
+  .header{padding:8px 12px;font-size:13px;}
+  .main-grid{padding:8px;gap:8px;}
+  .card-body{padding:8px 10px;}
+  td,th{padding:3px 6px;font-size:12px;}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo} = React;
+
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const API_ENDPOINTS = [
+  'https://api.binance.us/api/v3',
+  'https://api1.binance.com/api/v3',
+  'https://api.binance.com/api/v3',
+];
+const WS_ENDPOINTS = [
+  'wss://stream.binance.us:9443/ws/btcusdt@kline_1m',
+  'wss://stream.binance.com:9443/ws/btcusdt@kline_1m',
+];
+const TIMEFRAMES = ['15m','1h','4h','1d','1w'];
+const TF_LABELS  = {'15m':'15m','1h':'1H','4h':'4H','1d':'Daily','1w':'Weekly'};
+const TF_WEIGHTS = {'1w':5,'1d':4,'4h':3,'1h':2,'15m':1};
+const CANDLE_LIMIT = 200;
+const REFRESH_MS = 60000;
+const FETCH_TIMEOUT = 10000;
+
+// ═══════════════════════════════════════════════════════════════
+// DATA SERVICE
+// ═══════════════════════════════════════════════════════════════
+const DataService = {
+  _baseUrl: null,
+  _fetchWithTimeout(url, ms = FETCH_TIMEOUT) {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), ms);
+    return fetch(url, {signal:c.signal}).finally(() => clearTimeout(t));
+  },
+  async _findEndpoint(cb) {
+    for (const base of API_ENDPOINTS) {
+      try {
+        cb && cb(`Trying ${base}...`);
+        const r = await this._fetchWithTimeout(`${base}/ping`);
+        if (r.ok) { this._baseUrl = base; cb && cb(`Connected: ${base}`); return; }
+      } catch {}
+    }
+    throw new Error('All Binance API endpoints unreachable.');
+  },
+  async _fetch(url, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const r = await this._fetchWithTimeout(url);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r.json();
+      } catch (e) { if (i === retries - 1) throw e; await new Promise(r => setTimeout(r, 1000 * 2 ** i)); }
+    }
+  },
+  _parse(raw) {
+    return raw.map(k => ({time:k[0],open:+k[1],high:+k[2],low:+k[3],close:+k[4],volume:+k[5]}));
+  },
+  async fetchAll(cb) {
+    if (!this._baseUrl) await this._findEndpoint(cb);
+    cb && cb('Fetching candles...');
+    const candles = {};
+    const errs = [];
+    const res = await Promise.allSettled(TIMEFRAMES.map(async tf => {
+      const raw = await this._fetch(`${this._baseUrl}/klines?symbol=BTCUSDT&interval=${tf}&limit=${CANDLE_LIMIT}`);
+      candles[tf] = this._parse(raw);
+    }));
+    res.forEach((r, i) => { if (r.status === 'rejected') errs.push(TIMEFRAMES[i]); });
+    if (errs.length === TIMEFRAMES.length) throw new Error('All fetches failed');
+    cb && cb('Fetching ticker...');
+    const ticker = await this._fetch(`${this._baseUrl}/ticker/24hr?symbol=BTCUSDT`);
+    return {candles, ticker, errs};
+  },
+  getWsUrl() { return this._baseUrl?.includes('binance.us') ? WS_ENDPOINTS[0] : WS_ENDPOINTS[1]; },
+
+  // Paginated historical fetch — goes back to startMs, 1000 candles per request
+  _histCache: {},
+  async fetchHistorical(tf, startMs) {
+    const key = tf + '_' + startMs;
+    if (this._histCache[key]) return this._histCache[key];
+    if (!this._baseUrl) await this._findEndpoint();
+    const all = [];
+    let cursor = startMs;
+    const now = Date.now();
+    while (cursor < now) {
+      const raw = await this._fetch(`${this._baseUrl}/klines?symbol=BTCUSDT&interval=${tf}&startTime=${cursor}&limit=1000`);
+      if (!raw || !raw.length) break;
+      const parsed = this._parse(raw);
+      all.push(...parsed);
+      // next batch starts after the last candle's open time
+      const lastTime = raw[raw.length - 1][0];
+      if (lastTime <= cursor) break; // safety
+      cursor = lastTime + 1;
+      if (raw.length < 1000) break; // last page
+    }
+    this._histCache[key] = all;
+    return all;
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// INDICATOR ENGINE
+// ═══════════════════════════════════════════════════════════════
+const Ind = {
+  sma(d, p) {
+    const o = Array(d.length).fill(null);
+    for (let i = p - 1; i < d.length; i++) { let s = 0; for (let j = i - p + 1; j <= i; j++) s += d[j]; o[i] = s / p; }
+    return o;
+  },
+  ema(d, p) {
+    const k = 2 / (p + 1), o = Array(d.length).fill(null);
+    let s = 0; for (let i = 0; i < p; i++) s += d[i]; o[p - 1] = s / p;
+    for (let i = p; i < d.length; i++) o[i] = d[i] * k + o[i - 1] * (1 - k);
+    return o;
+  },
+  rsi(c, p = 14) {
+    const o = Array(c.length).fill(null);
+    if (c.length < p + 1) return o;
+    let gS = 0, lS = 0;
+    for (let i = 1; i <= p; i++) { const d = c[i] - c[i - 1]; d > 0 ? gS += d : lS -= d; }
+    let aG = gS / p, aL = lS / p;
+    o[p] = aL === 0 ? 100 : 100 - 100 / (1 + aG / aL);
+    for (let i = p + 1; i < c.length; i++) {
+      const d = c[i] - c[i - 1];
+      aG = (aG * (p - 1) + (d > 0 ? d : 0)) / p;
+      aL = (aL * (p - 1) + (d < 0 ? -d : 0)) / p;
+      o[i] = aL === 0 ? 100 : 100 - 100 / (1 + aG / aL);
+    }
+    return o;
+  },
+  macd(c, f = 12, s = 26, g = 9) {
+    const eF = this.ema(c, f), eS = this.ema(c, s);
+    const line = c.map((_, i) => eF[i] != null && eS[i] != null ? eF[i] - eS[i] : null);
+    const fv = line.findIndex(v => v != null);
+    const mv = line.slice(fv).map(v => v ?? 0);
+    const sr = this.ema(mv, g);
+    const signal = Array(fv).fill(null).concat(sr);
+    const hist = c.map((_, i) => line[i] != null && signal[i] != null ? line[i] - signal[i] : null);
+    return {line, signal, hist};
+  },
+  bollinger(c, p = 20, m = 2) {
+    const mid = this.sma(c, p), u = Array(c.length).fill(null), l = Array(c.length).fill(null), bw = Array(c.length).fill(null);
+    for (let i = p - 1; i < c.length; i++) {
+      let sq = 0; for (let j = i - p + 1; j <= i; j++) sq += (c[j] - mid[i]) ** 2;
+      const sd = Math.sqrt(sq / p);
+      u[i] = mid[i] + m * sd; l[i] = mid[i] - m * sd;
+      bw[i] = mid[i] ? ((u[i] - l[i]) / mid[i]) * 100 : null;
+    }
+    return {upper: u, middle: mid, lower: l, bw};
+  },
+  atr(candles, p = 14) {
+    const tr = candles.map((c, i) => i === 0 ? c.high - c.low : Math.max(c.high - c.low, Math.abs(c.high - candles[i-1].close), Math.abs(c.low - candles[i-1].close)));
+    const o = Array(candles.length).fill(null);
+    let s = 0; for (let i = 0; i < p; i++) s += tr[i]; o[p - 1] = s / p;
+    for (let i = p; i < tr.length; i++) o[i] = (o[i - 1] * (p - 1) + tr[i]) / p;
+    return o;
+  },
+  adx(candles, p = 14) {
+    const len = candles.length, pDI = Array(len).fill(null), mDI = Array(len).fill(null), adxO = Array(len).fill(null);
+    if (len < p * 2 + 1) return {adx: adxO, pDI, mDI};
+    const tr = [], pd = [], md = [];
+    for (let i = 1; i < len; i++) {
+      const h = candles[i].high, l = candles[i].low, pH = candles[i-1].high, pL = candles[i-1].low, pC = candles[i-1].close;
+      tr.push(Math.max(h - l, Math.abs(h - pC), Math.abs(l - pC)));
+      const u = h - pH, d = pL - l;
+      pd.push(u > d && u > 0 ? u : 0);
+      md.push(d > u && d > 0 ? d : 0);
+    }
+    let sT = 0, sP = 0, sM = 0;
+    for (let i = 0; i < p; i++) { sT += tr[i]; sP += pd[i]; sM += md[i]; }
+    const setDI = idx => { pDI[idx] = sT ? (sP / sT) * 100 : 0; mDI[idx] = sT ? (sM / sT) * 100 : 0; };
+    setDI(p);
+    const dx = [], dxV = (a, b) => (a + b) ? (Math.abs(a - b) / (a + b)) * 100 : 0;
+    dx.push(dxV(pDI[p], mDI[p]));
+    for (let i = p; i < tr.length; i++) {
+      sT = sT - sT / p + tr[i]; sP = sP - sP / p + pd[i]; sM = sM - sM / p + md[i];
+      setDI(i + 1); dx.push(dxV(pDI[i + 1], mDI[i + 1]));
+    }
+    if (dx.length >= p) {
+      let aS = 0; for (let i = 0; i < p; i++) aS += dx[i]; let aV = aS / p;
+      adxO[p * 2] = aV;
+      for (let i = p; i < dx.length; i++) { aV = (aV * (p - 1) + dx[i]) / p; adxO[p + i] = aV; }
+    }
+    return {adx: adxO, pDI, mDI};
+  },
+  stochRSI(c, rP = 14, sP = 14, kS = 3, dS = 3) {
+    const rv = this.rsi(c, rP), out = {k: Array(c.length).fill(null), d: Array(c.length).fill(null)};
+    const raw = Array(c.length).fill(null);
+    for (let i = 0; i < c.length; i++) {
+      if (rv[i] == null) continue;
+      let hi = -Infinity, lo = Infinity, n = 0;
+      for (let j = i; j >= 0 && n < sP; j--) { if (rv[j] == null) continue; hi = Math.max(hi, rv[j]); lo = Math.min(lo, rv[j]); n++; }
+      if (n === sP && hi !== lo) raw[i] = ((rv[i] - lo) / (hi - lo)) * 100;
+    }
+    const vK = []; for (let i = 0; i < raw.length; i++) if (raw[i] != null) vK.push({i, v: raw[i]});
+    for (let i = kS - 1; i < vK.length; i++) { let s = 0; for (let j = i - kS + 1; j <= i; j++) s += vK[j].v; out.k[vK[i].i] = s / kS; }
+    const vD = []; for (let i = 0; i < out.k.length; i++) if (out.k[i] != null) vD.push({i, v: out.k[i]});
+    for (let i = dS - 1; i < vD.length; i++) { let s = 0; for (let j = i - dS + 1; j <= i; j++) s += vD[j].v; out.d[vD[i].i] = s / dS; }
+    return out;
+  },
+  ichimoku(candles, tP = 9, kP = 26, bP = 52, disp = 26) {
+    const len = candles.length, hs = candles.map(c => c.high), ls = candles.map(c => c.low);
+    const mid = (a1, a2, idx, p) => {
+      if (idx < p - 1) return null;
+      let hi = -Infinity, lo = Infinity;
+      for (let i = idx - p + 1; i <= idx; i++) { hi = Math.max(hi, a1[i]); lo = Math.min(lo, a2[i]); }
+      return (hi + lo) / 2;
+    };
+    const tenkan = candles.map((_, i) => mid(hs, ls, i, tP));
+    const kijun = candles.map((_, i) => mid(hs, ls, i, kP));
+    const sA = Array(len + disp).fill(null), sB = Array(len + disp).fill(null);
+    for (let i = 0; i < len; i++) {
+      if (tenkan[i] != null && kijun[i] != null) sA[i + disp] = (tenkan[i] + kijun[i]) / 2;
+      const v = mid(hs, ls, i, bP); if (v != null) sB[i + disp] = v;
+    }
+    const chikou = Array(len).fill(null);
+    for (let i = disp; i < len; i++) chikou[i - disp] = candles[i].close;
+    return {tenkan, kijun, sA: sA.slice(0, len), sB: sB.slice(0, len), chikou};
+  },
+  vwap(candles) {
+    const o = []; let cTPV = 0, cV = 0;
+    for (const c of candles) { const tp = (c.high + c.low + c.close) / 3; cTPV += tp * c.volume; cV += c.volume; o.push(cV ? cTPV / cV : null); }
+    return o;
+  },
+  obv(candles) {
+    const o = [0];
+    for (let i = 1; i < candles.length; i++) o.push(o[i-1] + (candles[i].close > candles[i-1].close ? candles[i].volume : candles[i].close < candles[i-1].close ? -candles[i].volume : 0));
+    return o;
+  },
+  pivotPoints(c) {
+    const PP = (c.high + c.low + c.close) / 3;
+    return {pp:PP, r1:2*PP-c.low, s1:2*PP-c.high, r2:PP+(c.high-c.low), s2:PP-(c.high-c.low), r3:c.high+2*(PP-c.low), s3:c.low-2*(c.high-PP)};
+  },
+  fibRetrace(hi, lo) {
+    const d = hi - lo;
+    return [0,.236,.382,.5,.618,.786,1].map(r => ({r, p: hi - d * r}));
+  },
+  fibExtend(lo, hi, retLo) {
+    const d = hi - lo;
+    return [1,1.272,1.618,2].map(r => ({r, p: retLo + d * r}));
+  },
+  computeAll(candles) {
+    const c = candles.map(x => x.close), L = candles.length - 1, price = c[L];
+    const ema9=this.ema(c,9),ema21=this.ema(c,21),ema50=this.ema(c,50),ema100=this.ema(c,100),ema200=this.ema(c,200);
+    const sma50=this.sma(c,50),sma200=this.sma(c,200);
+    const rsiA=this.rsi(c,14),macdD=this.macd(c),stochD=this.stochRSI(c),adxD=this.adx(candles,14);
+    const bbD=this.bollinger(c),atrA=this.atr(candles,14);
+    const obvA=this.obv(candles),volSMA=this.sma(candles.map(x=>x.volume),20);
+    const ichiD=this.ichimoku(candles), vwapA=this.vwap(candles);
+    const pivC=candles.length>=2?candles[L-1]:candles[L], pivots=this.pivotPoints(pivC);
+    const rHi=Math.max(...candles.slice(-50).map(x=>x.high)),rLo=Math.min(...candles.slice(-50).map(x=>x.low));
+    const fibs=this.fibRetrace(rHi,rLo);
+    const fibExts=this.fibExtend(rLo,rHi,rLo);
+    const atrV=atrA[L],atrPct=atrV!=null?(atrV/price)*100:null;
+    const curVol=candles[L].volume,avgVol=volSMA[L],volRatio=avgVol&&avgVol>0?curVol/avgVol:null;
+    // SMA cross
+    let cross='None';
+    if(sma50[L]!=null&&sma200[L]!=null&&sma50[L-1]!=null&&sma200[L-1]!=null){
+      if(sma50[L-1]<=sma200[L-1]&&sma50[L]>sma200[L])cross='Golden Cross';
+      else if(sma50[L-1]>=sma200[L-1]&&sma50[L]<sma200[L])cross='Death Cross';
+      else cross=sma50[L]>sma200[L]?'Bullish (50>200)':'Bearish (50<200)';
+    }
+    // Ichimoku summary
+    const cT=ichiD.sA[L]!=null&&ichiD.sB[L]!=null?Math.max(ichiD.sA[L],ichiD.sB[L]):null;
+    const cB=ichiD.sA[L]!=null&&ichiD.sB[L]!=null?Math.min(ichiD.sA[L],ichiD.sB[L]):null;
+    const iPos=cT==null?'N/A':price>cT?'Above Cloud':price<cB?'Below Cloud':'Inside Cloud';
+    const tkX=ichiD.tenkan[L]!=null&&ichiD.kijun[L]!=null?(ichiD.tenkan[L]>ichiD.kijun[L]?'Bullish':'Bearish'):'N/A';
+    const bbSq=bbD.bw[L]!=null&&bbD.bw[L]<4;
+    // BB width percentile for volatility regime
+    const bwArr=bbD.bw.filter(v=>v!=null).slice(-50);
+    let bwPctile=null;
+    if(bwArr.length>=10&&bbD.bw[L]!=null){
+      const sorted=[...bwArr].sort((a,b)=>a-b);
+      bwPctile=(sorted.indexOf(sorted.reduce((a,b)=>Math.abs(b-bbD.bw[L])<Math.abs(a-bbD.bw[L])?b:a))/sorted.length)*100;
+    }
+    let volRegime='Normal';
+    if(bwPctile!=null){if(bwPctile<20)volRegime='Low Vol Squeeze';else if(bwPctile<50)volRegime='Normal';else if(bwPctile<80)volRegime='Elevated';else volRegime='Extreme Expansion';}
+
+    return {
+      price, candles, rsiArr: rsiA, obvArr: obvA,
+      ema:{9:ema9[L],21:ema21[L],50:ema50[L],100:ema100[L],200:ema200[L]},
+      sma:{50:sma50[L],200:sma200[L]}, cross,
+      ichimoku:{tenkan:ichiD.tenkan[L],kijun:ichiD.kijun[L],sA:ichiD.sA[L],sB:ichiD.sB[L],chikou:ichiD.chikou[L],pos:iPos,tkX,cloudTop:cT,cloudBot:cB},
+      vwap:vwapA[L],
+      rsi:rsiA[L],
+      macd:{line:macdD.line[L],signal:macdD.signal[L],hist:macdD.hist[L],xover:macdD.line[L]!=null&&macdD.signal[L]!=null?(macdD.line[L]>macdD.signal[L]?'Bullish':'Bearish'):'N/A'},
+      stochRSI:{k:stochD.k[L],d:stochD.d[L]},
+      adx:{val:adxD.adx[L],pDI:adxD.pDI[L],mDI:adxD.mDI[L]},
+      bb:{upper:bbD.upper[L],mid:bbD.middle[L],lower:bbD.lower[L],bw:bbD.bw[L],squeeze:bbSq},
+      atr:{val:atrV,pct:atrPct},
+      obv:obvA[L],obvPrev:obvA[L-1],volume:curVol,volAvg:avgVol,volRatio,
+      pivots,fibs,fibExts,
+      volRegime, bwPctile,
+      recentHigh:rHi, recentLow:rLo,
+    };
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SMC ENGINE (Smart Money Concepts)
+// ═══════════════════════════════════════════════════════════════
+const SMC = {
+  findSwings(candles, look = 5) {
+    const half = Math.floor(look / 2), highs = [], lows = [];
+    for (let i = half; i < candles.length - half; i++) {
+      let isH = true, isL = true;
+      for (let j = i - half; j <= i + half; j++) {
+        if (j === i) continue;
+        if (candles[j].high >= candles[i].high) isH = false;
+        if (candles[j].low <= candles[i].low) isL = false;
+      }
+      if (isH) highs.push({idx: i, price: candles[i].high, time: candles[i].time});
+      if (isL) lows.push({idx: i, price: candles[i].low, time: candles[i].time});
+    }
+    return {highs, lows};
+  },
+  detectBOS(candles, swings) {
+    const events = [];
+    const {highs, lows} = swings;
+    for (let i = 1; i < candles.length; i++) {
+      const rH = [...highs].reverse().find(h => h.idx < i);
+      const rL = [...lows].reverse().find(l => l.idx < i);
+      if (rH && candles[i].close > rH.price && !(candles[i-1].close > rH.price))
+        events.push({type:'bullish',price:rH.price,idx:i,swIdx:rH.idx,time:candles[i].time});
+      if (rL && candles[i].close < rL.price && !(candles[i-1].close < rL.price))
+        events.push({type:'bearish',price:rL.price,idx:i,swIdx:rL.idx,time:candles[i].time});
+    }
+    return events;
+  },
+  detectCHOCH(bos) {
+    const out = []; let prev = null;
+    for (const b of bos) { if (prev && b.type !== prev) out.push({...b, from: prev}); prev = b.type; }
+    return out;
+  },
+  findFVGs(candles) {
+    const fvgs = [];
+    for (let i = 2; i < candles.length; i++) {
+      if (candles[i-2].high < candles[i].low)
+        fvgs.push({type:'bullish',top:candles[i].low,bot:candles[i-2].high,idx:i-1,time:candles[i-1].time,filled:false});
+      if (candles[i-2].low > candles[i].high)
+        fvgs.push({type:'bearish',top:candles[i-2].low,bot:candles[i].high,idx:i-1,time:candles[i-1].time,filled:false});
+    }
+    for (const f of fvgs) {
+      for (let i = f.idx + 2; i < candles.length; i++) {
+        if (f.type === 'bullish' && candles[i].low <= f.bot) { f.filled = true; break; }
+        if (f.type === 'bearish' && candles[i].high >= f.top) { f.filled = true; break; }
+      }
+    }
+    return fvgs;
+  },
+  findOrderBlocks(candles) {
+    const obs = [], bodies = candles.map(c => Math.abs(c.close - c.open));
+    const avg = bodies.reduce((a, b) => a + b, 0) / bodies.length;
+    for (let i = 1; i < candles.length; i++) {
+      if (bodies[i] >= 2 * avg) {
+        const bull = candles[i].close > candles[i].open;
+        for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+          const opp = bull ? candles[j].close < candles[j].open : candles[j].close > candles[j].open;
+          if (opp) { obs.push({type:bull?'bullish':'bearish',high:candles[j].high,low:candles[j].low,idx:j,time:candles[j].time,dIdx:i}); break; }
+        }
+      }
+    }
+    return obs;
+  },
+  findLiquidity(swings) {
+    const levels = [], th = 0.001;
+    const check = (arr, type) => {
+      for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+        const d = Math.abs(arr[i].price - arr[j].price) / arr[i].price;
+        if (d <= th) {
+          const avg = (arr[i].price + arr[j].price) / 2;
+          if (!levels.find(l => l.type === type && Math.abs(l.price - avg) / avg < th))
+            levels.push({type, price: avg});
+        }
+      }
+    };
+    check(swings.highs, 'equal_highs');
+    check(swings.lows, 'equal_lows');
+    return levels;
+  },
+  findSR(swings, price) {
+    const levels = [];
+    for (const h of swings.highs.slice(-10)) levels.push({price:h.price,type:'resistance',src:'Swing High'});
+    for (const l of swings.lows.slice(-10)) levels.push({price:l.price,type:'support',src:'Swing Low'});
+    const base = Math.floor(price / 5000) * 5000;
+    for (let p = base - 15000; p <= base + 20000; p += 5000)
+      if (p > 0) levels.push({price:p,type:p>price?'resistance':'support',src:'Round Number'});
+    levels.sort((a, b) => Math.abs(a.price - price) - Math.abs(b.price - price));
+    return levels.slice(0, 15);
+  },
+  // Divergence detection
+  findDivergences(candles, rsiArr, obvArr) {
+    const swings = this.findSwings(candles, 5);
+    const divs = [];
+    const {highs, lows} = swings;
+    // RSI divergences on recent swings
+    if (lows.length >= 2) {
+      const [a, b] = lows.slice(-2);
+      const rA = rsiArr[a.idx], rB = rsiArr[b.idx];
+      if (rA != null && rB != null) {
+        if (b.price < a.price && rB > rA) divs.push({type:'Regular Bullish',ind:'RSI',desc:'Price lower low, RSI higher low'});
+        if (b.price > a.price && rB < rA) divs.push({type:'Hidden Bullish',ind:'RSI',desc:'Price higher low, RSI lower low'});
+      }
+    }
+    if (highs.length >= 2) {
+      const [a, b] = highs.slice(-2);
+      const rA = rsiArr[a.idx], rB = rsiArr[b.idx];
+      if (rA != null && rB != null) {
+        if (b.price > a.price && rB < rA) divs.push({type:'Regular Bearish',ind:'RSI',desc:'Price higher high, RSI lower high'});
+        if (b.price < a.price && rB > rA) divs.push({type:'Hidden Bearish',ind:'RSI',desc:'Price lower high, RSI higher high'});
+      }
+    }
+    // OBV divergences
+    if (lows.length >= 2) {
+      const [a, b] = lows.slice(-2);
+      const oA = obvArr[a.idx], oB = obvArr[b.idx];
+      if (oA != null && oB != null) {
+        if (b.price < a.price && oB > oA) divs.push({type:'Regular Bullish',ind:'OBV',desc:'Price lower low, OBV higher low'});
+      }
+    }
+    if (highs.length >= 2) {
+      const [a, b] = highs.slice(-2);
+      const oA = obvArr[a.idx], oB = obvArr[b.idx];
+      if (oA != null && oB != null) {
+        if (b.price > a.price && oB < oA) divs.push({type:'Regular Bearish',ind:'OBV',desc:'Price higher high, OBV lower high'});
+      }
+    }
+    return divs;
+  },
+  computeAll(candles, rsiArr, obvArr) {
+    const swings = this.findSwings(candles, 5);
+    const bos = this.detectBOS(candles, swings);
+    const choch = this.detectCHOCH(bos);
+    const fvgs = this.findFVGs(candles);
+    const obs = this.findOrderBlocks(candles);
+    const liq = this.findLiquidity(swings);
+    const sr = this.findSR(swings, candles[candles.length - 1].close);
+    const divs = this.findDivergences(candles, rsiArr, obvArr);
+    const lastBOS = bos.length ? bos[bos.length - 1] : null;
+    const lastCHOCH = choch.length ? choch[choch.length - 1] : null;
+    const unfilled = fvgs.filter(f => !f.filled);
+    return {
+      swings, bos: bos.slice(-5), choch: choch.slice(-3),
+      fvgs: unfilled.slice(-8), allFvgs: fvgs, obs: obs.slice(-8),
+      liq, sr, divs,
+      structure: lastBOS ? lastBOS.type : 'undefined',
+      lastBOS, lastCHOCH,
+      stats: {swH:swings.highs.length,swL:swings.lows.length,bosN:bos.length,fvgN:fvgs.length,unfN:unfilled.length,obN:obs.length}
+    };
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// CONFLUENCE SCORER
+// ═══════════════════════════════════════════════════════════════
+const Confluence = {
+  scoreTF(ind, smc) {
+    let score = 0;
+    const factors = [];
+    const add = (pts, label) => { score += pts; factors.push({pts, label}); };
+    // Price vs EMAs (+/-10 each)
+    if (ind.ema[9] != null) add(ind.price > ind.ema[9] ? 10 : -10, `Price ${ind.price > ind.ema[9] ? '>' : '<'} EMA9`);
+    if (ind.ema[21] != null) add(ind.price > ind.ema[21] ? 10 : -10, `Price ${ind.price > ind.ema[21] ? '>' : '<'} EMA21`);
+    if (ind.ema[50] != null) add(ind.price > ind.ema[50] ? 10 : -10, `Price ${ind.price > ind.ema[50] ? '>' : '<'} EMA50`);
+    if (ind.ema[100] != null) add(ind.price > ind.ema[100] ? 10 : -10, `Price ${ind.price > ind.ema[100] ? '>' : '<'} EMA100`);
+    if (ind.ema[200] != null) add(ind.price > ind.ema[200] ? 10 : -10, `Price ${ind.price > ind.ema[200] ? '>' : '<'} EMA200`);
+    // RSI (+/-15)
+    if (ind.rsi != null) {
+      if (ind.rsi > 70) add(-15, `RSI overbought (${ind.rsi.toFixed(0)})`);
+      else if (ind.rsi < 30) add(15, `RSI oversold (${ind.rsi.toFixed(0)})`);
+      else if (ind.rsi > 55) add(5, `RSI bullish (${ind.rsi.toFixed(0)})`);
+      else if (ind.rsi < 45) add(-5, `RSI bearish (${ind.rsi.toFixed(0)})`);
+    }
+    // Divergences
+    if (smc.divs) {
+      for (const d of smc.divs) {
+        if (d.type.includes('Bullish')) add(8, `${d.type} divergence (${d.ind})`);
+        else add(-8, `${d.type} divergence (${d.ind})`);
+      }
+    }
+    // MACD (+/-10)
+    if (ind.macd.xover === 'Bullish') add(10, 'MACD bullish crossover');
+    else if (ind.macd.xover === 'Bearish') add(-10, 'MACD bearish crossover');
+    if (ind.macd.hist != null) {
+      if (ind.macd.hist > 0) add(3, 'MACD histogram positive');
+      else add(-3, 'MACD histogram negative');
+    }
+    // Ichimoku (+/-15)
+    if (ind.ichimoku.pos === 'Above Cloud') add(10, 'Price above Ichimoku cloud');
+    else if (ind.ichimoku.pos === 'Below Cloud') add(-10, 'Price below Ichimoku cloud');
+    if (ind.ichimoku.tkX === 'Bullish') add(5, 'Ichimoku TK bullish');
+    else if (ind.ichimoku.tkX === 'Bearish') add(-5, 'Ichimoku TK bearish');
+    // Market structure BOS/CHOCH (+/-20)
+    if (smc.structure === 'bullish') add(15, 'Bullish market structure');
+    else if (smc.structure === 'bearish') add(-15, 'Bearish market structure');
+    if (smc.lastCHOCH) {
+      if (smc.lastCHOCH.type === 'bullish') add(5, 'Recent bullish CHOCH');
+      else add(-5, 'Recent bearish CHOCH');
+    }
+    // OBV (+/-10)
+    if (ind.obv != null && ind.obvPrev != null) {
+      add(ind.obv > ind.obvPrev ? 10 : -10, `OBV ${ind.obv > ind.obvPrev ? 'rising' : 'falling'}`);
+    }
+    // ADX multiplier
+    let adxMult = 1;
+    if (ind.adx.val != null) {
+      if (ind.adx.val < 20) adxMult = 0.5;
+      else if (ind.adx.val > 40) adxMult = 1.5;
+    }
+    score = Math.max(-100, Math.min(100, Math.round(score * adxMult)));
+    return {score, factors, adxMult};
+  },
+  composite(tfScores) {
+    let wSum = 0, wTotal = 0;
+    const breakdown = {};
+    for (const tf of TIMEFRAMES) {
+      if (!tfScores[tf]) continue;
+      const w = TF_WEIGHTS[tf];
+      wSum += tfScores[tf].score * w;
+      wTotal += w;
+      breakdown[tf] = {score: tfScores[tf].score, weight: w, weighted: tfScores[tf].score * w};
+    }
+    const score = wTotal ? Math.round(wSum / wTotal) : 0;
+    let signal = 'NEUTRAL';
+    if (score >= 60) signal = 'STRONG LONG';
+    else if (score >= 20) signal = 'LONG';
+    else if (score <= -60) signal = 'STRONG SHORT';
+    else if (score <= -20) signal = 'SHORT';
+    return {score, signal, breakdown};
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TRADE SETUP GENERATOR
+// ═══════════════════════════════════════════════════════════════
+const TradeGen = {
+  generate(direction, allInd, allSmc, composite, tradeCapital, riskAmt) {
+    // Use 4H as primary timeframe for setup, with daily/weekly for targets
+    const tf4h = allInd['4h'] || allInd['1h'];
+    const tfD = allInd['1d'];
+    const smc4h = allSmc['4h'] || allSmc['1h'];
+    if (!tf4h) return null;
+    const isLong = direction === 'LONG' || direction === 'STRONG LONG';
+    const price = tf4h.price;
+    const atr = tf4h.atr.val || price * 0.02;
+
+    // ── ENTRY ──
+    let entry = price;
+    if (isLong) {
+      // Check for bullish FVG near price
+      const fvg = smc4h?.fvgs?.find(f => f.type === 'bullish' && f.top >= price * 0.97 && f.bot <= price);
+      if (fvg) entry = (fvg.top + fvg.bot) / 2;
+      // Check bullish OB near price
+      const ob = smc4h?.obs?.find(o => o.type === 'bullish' && o.high >= price * 0.97 && o.low <= price);
+      if (ob) entry = Math.min(entry, (ob.high + ob.low) / 2);
+      // 50% fib retracement
+      const fib50 = tf4h.fibs?.find(f => f.r === 0.5);
+      if (fib50 && fib50.p < price && fib50.p > price * 0.95) entry = Math.min(entry, fib50.p);
+      // Kijun as support
+      if (tf4h.ichimoku.kijun && tf4h.ichimoku.kijun < price && tf4h.ichimoku.kijun > price * 0.97)
+        entry = Math.min(entry, tf4h.ichimoku.kijun);
+    } else {
+      const fvg = smc4h?.fvgs?.find(f => f.type === 'bearish' && f.bot <= price * 1.03 && f.top >= price);
+      if (fvg) entry = (fvg.top + fvg.bot) / 2;
+      const ob = smc4h?.obs?.find(o => o.type === 'bearish' && o.low <= price * 1.03 && o.high >= price);
+      if (ob) entry = Math.max(entry, (ob.high + ob.low) / 2);
+      const fib50 = tf4h.fibs?.find(f => f.r === 0.5);
+      if (fib50 && fib50.p > price && fib50.p < price * 1.05) entry = Math.max(entry, fib50.p);
+      if (tf4h.ichimoku.kijun && tf4h.ichimoku.kijun > price && tf4h.ichimoku.kijun < price * 1.03)
+        entry = Math.max(entry, tf4h.ichimoku.kijun);
+    }
+
+    // ── ENTRY LADDER (scale-in zones + front-run offsets) ──
+    const frOffset = atr * 0.15; // front-run offset: 15% of ATR
+    const ladder = [];
+    if (isLong) {
+      // Aggressive: slightly above entry (front-run the obvious level)
+      ladder.push({zone:'Aggressive', price: entry + frOffset, pct: 25, reason:'Front-runs the entry level by ' + fmtP(frOffset)});
+      // Target: the calculated entry
+      ladder.push({zone:'Target', price: entry, pct: 50, reason:'Primary entry at calculated level'});
+      // Deep: below entry near OB/FVG/fib for a better fill
+      let deepPrice = entry - atr * 0.5;
+      let deepReason = 'Half ATR below entry';
+      // Look for structural levels below
+      const nearOB = smc4h?.obs?.find(o => o.type === 'bullish' && o.high < entry && o.high > entry - atr);
+      if (nearOB) { deepPrice = nearOB.high; deepReason = 'Top of bullish order block'; }
+      const nearFVG = smc4h?.fvgs?.find(f => f.type === 'bullish' && f.top < entry && f.top > entry - atr);
+      if (nearFVG) { deepPrice = Math.min(deepPrice, nearFVG.top); deepReason = 'Top of bullish FVG'; }
+      ladder.push({zone:'Deep', price: deepPrice, pct: 25, reason: deepReason});
+    } else {
+      ladder.push({zone:'Aggressive', price: entry - frOffset, pct: 25, reason:'Front-runs the entry level by ' + fmtP(frOffset)});
+      ladder.push({zone:'Target', price: entry, pct: 50, reason:'Primary entry at calculated level'});
+      let deepPrice = entry + atr * 0.5;
+      let deepReason = 'Half ATR above entry';
+      const nearOB = smc4h?.obs?.find(o => o.type === 'bearish' && o.low > entry && o.low < entry + atr);
+      if (nearOB) { deepPrice = nearOB.low; deepReason = 'Bottom of bearish order block'; }
+      const nearFVG = smc4h?.fvgs?.find(f => f.type === 'bearish' && f.bot > entry && f.bot < entry + atr);
+      if (nearFVG) { deepPrice = Math.max(deepPrice, nearFVG.bot); deepReason = 'Bottom of bearish FVG'; }
+      ladder.push({zone:'Deep', price: deepPrice, pct: 25, reason: deepReason});
+    }
+    // Detect if entry is near obvious levels (round numbers, pivots, fibs)
+    const nearbyObvious = [];
+    const roundNum = Math.round(entry / 1000) * 1000;
+    if (Math.abs(entry - roundNum) < atr * 0.3) nearbyObvious.push({level: '$' + roundNum.toLocaleString(), type:'Round Number'});
+    if (tf4h.pivots) {
+      ['pp','s1','s2','r1','r2'].forEach(k => {
+        const p = tf4h.pivots[k];
+        if (p && Math.abs(entry - p) < atr * 0.2) nearbyObvious.push({level: fmtP(p), type:'Pivot ' + k.toUpperCase()});
+      });
+    }
+    tf4h.fibs?.forEach(f => {
+      if ([0.382, 0.5, 0.618].includes(f.r) && Math.abs(entry - f.p) < atr * 0.2)
+        nearbyObvious.push({level: fmtP(f.p), type: (f.r*100).toFixed(1) + '% Fib'});
+    });
+    // Weighted avg entry
+    const weightedEntry = ladder.reduce((s,l) => s + l.price * l.pct, 0) / 100;
+
+    // ── STOP LOSS ──
+    let sl;
+    if (isLong) {
+      const candidates = [entry - 1.5 * atr];
+      // Below nearest swing low
+      const swLow = smc4h?.swings?.lows?.slice(-3).map(l => l.price).filter(p => p < entry);
+      if (swLow?.length) candidates.push(Math.max(...swLow) - atr * 0.1);
+      // Below OB
+      const ob = smc4h?.obs?.find(o => o.type === 'bullish' && o.low < entry);
+      if (ob) candidates.push(ob.low - atr * 0.1);
+      // Below cloud
+      if (tf4h.ichimoku.cloudBot && tf4h.ichimoku.cloudBot < entry) candidates.push(tf4h.ichimoku.cloudBot - atr * 0.1);
+      // Below BB lower
+      if (tf4h.bb.squeeze && tf4h.bb.lower) candidates.push(tf4h.bb.lower);
+      sl = Math.max(...candidates); // most conservative = highest SL for long
+      // Clamp: min 0.5%, max 5%
+      const minSl = entry * 0.995, maxSl = entry * 0.95;
+      sl = Math.min(sl, minSl);
+      sl = Math.max(sl, maxSl);
+    } else {
+      const candidates = [entry + 1.5 * atr];
+      const swHigh = smc4h?.swings?.highs?.slice(-3).map(h => h.price).filter(p => p > entry);
+      if (swHigh?.length) candidates.push(Math.min(...swHigh) + atr * 0.1);
+      const ob = smc4h?.obs?.find(o => o.type === 'bearish' && o.high > entry);
+      if (ob) candidates.push(ob.high + atr * 0.1);
+      if (tf4h.ichimoku.cloudTop && tf4h.ichimoku.cloudTop > entry) candidates.push(tf4h.ichimoku.cloudTop + atr * 0.1);
+      if (tf4h.bb.squeeze && tf4h.bb.upper) candidates.push(tf4h.bb.upper);
+      sl = Math.min(...candidates);
+      const minSl = entry * 1.005, maxSl = entry * 1.05;
+      sl = Math.max(sl, minSl);
+      sl = Math.min(sl, maxSl);
+    }
+
+    // ── TAKE PROFITS ──
+    const tps = [];
+    if (isLong) {
+      // TP1: nearest resistance or 1.0 fib ext
+      const res = smc4h?.sr?.filter(l => l.type === 'resistance' && l.price > entry).sort((a,b) => a.price - b.price);
+      const fibE1 = tf4h.fibExts?.find(f => f.r === 1);
+      tps.push({pct:33, price: Math.min(res?.[0]?.price || entry + 2*atr, fibE1?.p || entry + 2*atr, entry + 2*atr), label:'TP1'});
+      // TP2: 1.618 fib ext
+      const fibE2 = tf4h.fibExts?.find(f => f.r === 1.618);
+      tps.push({pct:33, price: fibE2?.p || entry + 3.5*atr, label:'TP2'});
+      // TP3: 2.0 fib ext or weekly level
+      const fibE3 = tf4h.fibExts?.find(f => f.r === 2);
+      tps.push({pct:34, price: fibE3?.p || entry + 5*atr, label:'TP3'});
+    } else {
+      const sup = smc4h?.sr?.filter(l => l.type === 'support' && l.price < entry).sort((a,b) => b.price - a.price);
+      tps.push({pct:33, price: Math.max(sup?.[0]?.price || entry - 2*atr, entry - 2*atr), label:'TP1'});
+      tps.push({pct:33, price: entry - 3.5*atr, label:'TP2'});
+      tps.push({pct:34, price: entry - 5*atr, label:'TP3'});
+    }
+
+    // ── RISK / REWARD ──
+    const slDist = Math.abs(entry - sl);
+    const rr1 = slDist > 0 ? Math.abs(tps[0].price - entry) / slDist : 0;
+    const rr2 = slDist > 0 ? Math.abs(tps[1].price - entry) / slDist : 0;
+    const rr3 = slDist > 0 ? Math.abs(tps[2].price - entry) / slDist : 0;
+    const avgRR = (rr1 * 0.33 + rr2 * 0.33 + rr3 * 0.34);
+
+    // ── POSITION SIZING ──
+    // riskAmt is the dollar amount user is willing to lose at SL
+    const slPct = slDist / entry;
+    const posSizeUSD = slPct > 0 ? riskAmt / slPct : 0;
+    const posSizeBTC = posSizeUSD / entry;
+
+    // ── LEVERAGE ──
+    // Derive leverage needed from position vs trade capital
+    const atrPct = tf4h.atr.pct || 2;
+    let maxLev;
+    if (atrPct < 1.5) maxLev = 10;
+    else if (atrPct < 3) maxLev = 5;
+    else if (atrPct < 5) maxLev = 3;
+    else maxLev = 2;
+    // Leverage needed = position / capital
+    let levNeeded = tradeCapital > 0 ? Math.ceil(posSizeUSD / tradeCapital) : 1;
+    levNeeded = Math.max(1, levNeeded);
+    // Use the needed leverage but cap at ATR-safe max
+    let lev = Math.min(levNeeded, maxLev);
+    // Ensure liquidation is farther than SL
+    while (lev > 1) {
+      const testLiq = isLong ? entry * (1 - 1/lev) : entry * (1 + 1/lev);
+      const liqSafe = isLong ? testLiq < sl : testLiq > sl;
+      if (liqSafe) break;
+      lev--;
+    }
+    const liqPrice = isLong ? entry * (1 - 1/lev) : entry * (1 + 1/lev);
+    const margin = posSizeUSD / lev;
+    const levWarning = levNeeded > maxLev;
+
+    // ── CONFIDENCE ──
+    const abScore = Math.abs(composite.score);
+    const confidence = Math.min(95, Math.max(15, abScore + (avgRR > 2 ? 10 : 0) + (smc4h?.divs?.length ? 5 : 0)));
+
+    // ── ENTRY TIMING ──
+    const timing = this._calcTiming(isLong, allInd, allSmc, composite, tf4h, smc4h, entry, price);
+
+    // ── EXECUTIVE SUMMARY ──
+    const summary = this._buildSummary(isLong, direction, allInd, allSmc, composite, tf4h, smc4h, entry, sl, tps, confidence, timing);
+
+    return {
+      direction: isLong ? 'LONG' : 'SHORT', entry, sl, tps, slDist, slPct: slPct * 100,
+      rr: [rr1, rr2, rr3], avgRR, posSizeUSD, posSizeBTC, lev, levNeeded, levWarning, maxLev, liqPrice, margin,
+      tradeCapital, riskAmt, confidence, atrPct, price, timing, summary,
+      ladder, weightedEntry, nearbyObvious, frOffset
+    };
+  },
+
+  _calcTiming(isLong, allInd, allSmc, composite, tf4h, smc4h, entry, price) {
+    const timing = { action: 'WAIT', confirmTF: null, reasons: [], countdown: null, conditions: [], entryType: 'market' };
+
+    // ── Price proximity check ──
+    const entryDist = Math.abs(price - entry) / price * 100; // percent away
+    const priceNearEntry = entryDist < 0.3; // within 0.3%
+    const priceFarFromEntry = entryDist > 0.5;
+
+    if (priceFarFromEntry) {
+      timing.entryType = 'limit';
+      const above = price > entry;
+      timing.reasons.push(`Current price ($${price.toLocaleString(undefined,{maximumFractionDigits:0})}) is ${entryDist.toFixed(1)}% ${above ? 'above' : 'below'} entry ($${entry.toLocaleString(undefined,{maximumFractionDigits:0})})`);
+      timing.reasons.push(`Set a limit order at $${entry.toLocaleString(undefined,{maximumFractionDigits:0})} — do not market enter here`);
+      timing.reasons.push('When price reaches the entry zone, confirm with a 15m candle close before executing');
+    }
+
+    // ── Check TF alignment ──
+    const aligned = [], conflicting = [];
+    for (const tf of TIMEFRAMES) {
+      if (!allInd[tf] || !allSmc[tf]) continue;
+      const s = Confluence.scoreTF(allInd[tf], allSmc[tf]).score;
+      if ((isLong && s > 10) || (!isLong && s < -10)) aligned.push(tf);
+      else if ((isLong && s < -10) || (!isLong && s > 10)) conflicting.push(tf);
+    }
+
+    const majorAligned = aligned.filter(tf => ['1w','1d','4h'].includes(tf)).length;
+    const entryTFAligned = aligned.includes('1h') || aligned.includes('15m');
+
+    // ── Determine action ──
+    if (priceFarFromEntry) {
+      // Price is not near entry — always wait regardless of alignment
+      timing.action = 'SET LIMIT ORDER';
+      timing.confirmTF = '15m';
+      if (majorAligned >= 2 && entryTFAligned) {
+        timing.reasons.push('Timeframes are well aligned — the setup is valid, but price needs to come to your entry');
+      } else if (majorAligned >= 2) {
+        timing.reasons.push('Higher timeframes aligned, lower timeframes not yet confirmed');
+      }
+    } else if (priceNearEntry && majorAligned >= 2 && entryTFAligned) {
+      timing.action = 'ENTER NOW';
+      timing.entryType = 'market';
+      timing.reasons.push('Price is at entry level and all major + entry timeframes are aligned');
+    } else if (priceNearEntry && majorAligned >= 2 && !entryTFAligned) {
+      timing.action = 'WAIT FOR CONFIRMATION';
+      const waitTF = !aligned.includes('1h') ? '1h' : '15m';
+      timing.confirmTF = waitTF;
+      timing.reasons.push(`Price is near entry, but ${TF_LABELS[waitTF]} has not confirmed direction yet`);
+      timing.reasons.push(`Wait for ${TF_LABELS[waitTF]} candle close to align before entering`);
+    } else if (priceNearEntry && majorAligned < 2) {
+      timing.action = 'WAIT FOR CONFIRMATION';
+      timing.confirmTF = '4h';
+      timing.reasons.push('Price is near entry but not enough timeframe alignment');
+      timing.reasons.push('Wait for 4H candle close to strengthen the signal');
+    } else {
+      // Price somewhat near but not quite
+      timing.action = 'WAIT FOR CONFIRMATION';
+      timing.confirmTF = '15m';
+      timing.reasons.push(`Price is ${entryDist.toFixed(1)}% from entry — getting close`);
+      timing.reasons.push('Watch for price to reach entry zone, then confirm with 15m close');
+    }
+
+    if (conflicting.length > 0) {
+      timing.reasons.push(`Conflicting signals on: ${conflicting.map(tf => TF_LABELS[tf]).join(', ')}`);
+    }
+
+    // ── Candle countdown ──
+    const now = Date.now();
+    const intervals = {'15m':15*60*1000,'1h':60*60*1000,'4h':4*60*60*1000};
+    const countdowns = [];
+    for (const [tf, ms] of Object.entries(intervals)) {
+      if (!allInd[tf]?.candles?.length) continue;
+      const lastTime = allInd[tf].candles[allInd[tf].candles.length - 1].time;
+      const nextClose = lastTime + ms;
+      const remaining = Math.max(0, nextClose - now);
+      if (remaining > 0) {
+        const mins = Math.floor(remaining / 60000);
+        const hrs = Math.floor(mins / 60);
+        const m = mins % 60;
+        countdowns.push({ tf, remaining, label: hrs > 0 ? `${hrs}h ${m}m` : `${m}m` });
+      }
+    }
+    timing.countdowns = countdowns;
+
+    // ── Pending conditions / watch-for ──
+    if (tf4h.rsi != null) {
+      if (isLong && tf4h.rsi < 40 && tf4h.rsi > 25) timing.conditions.push('RSI approaching oversold on 4H — potential bounce zone');
+      if (!isLong && tf4h.rsi > 60 && tf4h.rsi < 75) timing.conditions.push('RSI approaching overbought on 4H — potential rejection zone');
+    }
+    if (tf4h.macd.hist != null) {
+      const hist = tf4h.macd.hist;
+      if (isLong && hist < 0 && hist > -50) timing.conditions.push('MACD histogram narrowing on 4H — momentum shift building');
+      if (!isLong && hist > 0 && hist < 50) timing.conditions.push('MACD histogram fading on 4H — bearish momentum building');
+    }
+    if (tf4h.bb.squeeze) timing.conditions.push('Bollinger Band squeeze active — expect volatility expansion');
+    if (smc4h?.divs?.length) {
+      for (const d of smc4h.divs) {
+        if ((isLong && d.type.includes('Bullish')) || (!isLong && d.type.includes('Bearish')))
+          timing.conditions.push(`${d.type} ${d.ind} divergence supports the setup`);
+      }
+    }
+
+    return timing;
+  },
+
+  _buildSummary(isLong, direction, allInd, allSmc, composite, tf4h, smc4h, entry, sl, tps, confidence, timing) {
+    const dir = isLong ? 'long (buy)' : 'short (sell)';
+    const strength = Math.abs(composite.score) >= 60 ? 'strong' : 'moderate';
+    const price = tf4h.price;
+
+    // Build reason parts
+    const reasons = [];
+
+    // Trend reason
+    const emaCount = [9,21,50,100,200].filter(p => tf4h.ema[p] != null && (isLong ? price > tf4h.ema[p] : price < tf4h.ema[p])).length;
+    if (emaCount >= 4) reasons.push(`price is ${isLong ? 'above' : 'below'} ${emaCount} of 5 moving averages`);
+    else if (emaCount >= 3) reasons.push(`price is ${isLong ? 'above' : 'below'} most moving averages`);
+
+    // Ichimoku
+    if (tf4h.ichimoku.pos === 'Above Cloud' && isLong) reasons.push('trading above the Ichimoku cloud');
+    else if (tf4h.ichimoku.pos === 'Below Cloud' && !isLong) reasons.push('trading below the Ichimoku cloud');
+
+    // Structure
+    if (smc4h?.structure === 'bullish' && isLong) reasons.push('bullish market structure intact');
+    else if (smc4h?.structure === 'bearish' && !isLong) reasons.push('bearish market structure intact');
+
+    // RSI
+    if (tf4h.rsi != null) {
+      if (tf4h.rsi > 70) reasons.push('RSI is overbought suggesting a pullback is likely');
+      else if (tf4h.rsi < 30) reasons.push('RSI is oversold suggesting a bounce is likely');
+      else if (isLong && tf4h.rsi > 50) reasons.push('RSI shows bullish momentum');
+      else if (!isLong && tf4h.rsi < 50) reasons.push('RSI shows bearish momentum');
+    }
+
+    // Volume
+    if (tf4h.volRatio > 1.5) reasons.push('volume is elevated confirming the move');
+    if (tf4h.obv > tf4h.obvPrev && isLong) reasons.push('on-balance volume is rising');
+    else if (tf4h.obv < tf4h.obvPrev && !isLong) reasons.push('on-balance volume is declining');
+
+    // MACD
+    if (tf4h.macd.xover === 'Bullish' && isLong) reasons.push('MACD has crossed bullish');
+    else if (tf4h.macd.xover === 'Bearish' && !isLong) reasons.push('MACD has crossed bearish');
+
+    // Divergences
+    if (smc4h?.divs?.length) {
+      const relevant = smc4h.divs.filter(d => (isLong && d.type.includes('Bullish')) || (!isLong && d.type.includes('Bearish')));
+      if (relevant.length) reasons.push(`${relevant[0].type.toLowerCase()} divergence detected on ${relevant[0].ind}`);
+    }
+
+    // Timeframe alignment
+    const tfAligned = TIMEFRAMES.filter(tf => {
+      if (!allInd[tf] || !allSmc[tf]) return false;
+      const s = Confluence.scoreTF(allInd[tf], allSmc[tf]).score;
+      return isLong ? s > 10 : s < -10;
+    });
+    if (tfAligned.length >= 4) reasons.push(`${tfAligned.length} of 5 timeframes agree on direction`);
+
+    const reasonText = reasons.length > 0 ? reasons.slice(0, 4).join(', ') : 'multiple technical factors aligning';
+
+    let actionText, headline, bodyPrefix;
+    const priceStr = price.toLocaleString(undefined,{maximumFractionDigits:0});
+    const entryStr = entry.toLocaleString(undefined,{maximumFractionDigits:0});
+    const slStr = sl.toLocaleString(undefined,{maximumFractionDigits:0});
+    const tp1Str = tps[0].price.toLocaleString(undefined,{maximumFractionDigits:0});
+    const capStrength = strength.charAt(0).toUpperCase() + strength.slice(1);
+    const bias = isLong ? 'bullish' : 'bearish';
+
+    if (timing.action === 'ENTER NOW') {
+      headline = `${capStrength} ${bias} setup — price is at entry level.`;
+      bodyPrefix = `The analysis is ${bias} and price is at the suggested entry.`;
+      actionText = 'Conditions are aligned — enter now.';
+    } else if (timing.action === 'SET LIMIT ORDER') {
+      const dist = ((Math.abs(price - entry) / price) * 100).toFixed(1);
+      const side = price > entry ? 'above' : 'below';
+      headline = `${capStrength} ${bias} bias — DO NOT enter at current price.`;
+      bodyPrefix = `The analysis is ${bias}, but price ($${priceStr}) is ${dist}% ${side} the suggested entry ($${entryStr}). This is NOT an entry signal at the current price.`;
+      actionText = `Set a limit order at $${entryStr} and wait. When price reaches the entry zone, confirm with a 15m candle close before executing.`;
+    } else if (timing.confirmTF) {
+      headline = `${capStrength} ${bias} bias — waiting for confirmation.`;
+      bodyPrefix = `The analysis leans ${bias}, but the setup is not confirmed yet.`;
+      actionText = `Wait for a ${TF_LABELS[timing.confirmTF]} candle close to confirm direction before entering.`;
+    } else {
+      headline = `${capStrength} ${bias} bias — not ready to trade.`;
+      bodyPrefix = `The analysis leans ${bias}, but timeframes are not aligned for a trade.`;
+      actionText = 'Wait for better timeframe alignment before considering an entry.';
+    }
+
+    return {
+      headline,
+      body: `${bodyPrefix} Composite score: ${composite.score > 0 ? '+' : ''}${composite.score}/100. Key reasons: ${reasonText}. Suggested setup: entry $${entryStr}, stop $${slStr}, first target $${tp1Str}.`,
+      action: actionText,
+      confidence: `Confidence: ${confidence}%.`,
+    };
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SESSION AWARENESS
+// ═══════════════════════════════════════════════════════════════
+function getActiveSessions() {
+  const h = new Date().getUTCHours();
+  const sessions = [];
+  if (h >= 0 && h < 9) sessions.push({name:'Asia',color:'#f59e0b'});
+  if (h >= 7 && h < 16) sessions.push({name:'London',color:'#3b82f6'});
+  if (h >= 13 && h < 22) sessions.push({name:'New York',color:'#22c55e'});
+  if (!sessions.length) sessions.push({name:'Off-hours',color:'#64748b'});
+  return sessions;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FORMAT HELPERS
+// ═══════════════════════════════════════════════════════════════
+const fmt = (v, d = 2) => v != null ? Number(v).toFixed(d) : '—';
+const fmtP = (v) => v != null ? '$' + Number(v).toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+const fmtK = (v) => { if(v==null)return '—'; const a=Math.abs(v); return a>=1e9?(v/1e9).toFixed(1)+'B':a>=1e6?(v/1e6).toFixed(1)+'M':a>=1e3?(v/1e3).toFixed(1)+'K':fmt(v,0); };
+const rCls = v => v==null?'muted':v>70?'bear':v<30?'bull':'';
+const sCls = v => v==null?'muted':v>80?'bear':v<20?'bull':'';
+
+// ═══════════════════════════════════════════════════════════════
+// TOOLTIP SYSTEM
+// ═══════════════════════════════════════════════════════════════
+const TIPS = {
+  // Card headers / sections
+  confluence: 'Scores signals across 5 timeframes (15m to Weekly), weighted by importance. Range: -100 (strong short) to +100 (strong long). Neutral zone is -20 to +20.',
+  tradeSetup: 'Auto-generated entry, stop loss, and 3 take-profit levels based on multi-timeframe confluence analysis and current price structure.',
+  tfAnalysis: 'Detailed indicator breakdown for the selected timeframe. Switch tabs to compare signals across different time horizons.',
+  keyLevels: 'Important horizontal price levels where buying or selling pressure is expected. Derived from pivots, Fibonacci, swing points, and round numbers.',
+  scoreFactors: 'Every individual signal contributing to this timeframe\'s score. Positive points = bullish, negative = bearish. ADX multiplier amplifies scores when trend is strong.',
+  summary: 'Plain-language interpretation of the current market setup, combining all indicators into an actionable narrative.',
+  entryTiming: 'Real-time assessment of whether to enter now, set a limit order, or wait. Based on price proximity to entry and timeframe alignment.',
+  journal: 'Personal trade log. Record setups, track outcomes (Win/Loss), and measure performance over time. Auto-saves to browser; export to Excel for permanent records.',
+  priceChart: 'Candlestick chart with EMA overlays (9/21/50), Bollinger Bands, volume, and SMC markers (BOS/CHOCH). Trade levels drawn when a setup is active.',
+  priceHistory: 'Clean area chart for visual price trend. Daily and Weekly go back to January 2017 (~3,300+ candles). 4H covers 1 year, 1H covers 90 days, 15m covers 14 days. Data is fetched once and cached.',
+
+  // Trend indicators
+  ema: 'Exponential Moving Average — weights recent prices more heavily. Price above = bullish bias, below = bearish. Shorter periods (9, 21) react faster than longer ones (100, 200).',
+  sma50200: 'Simple Moving Averages. "Golden Cross" (50 crosses above 200) = major bullish signal. "Death Cross" (50 below 200) = bearish.',
+  ichimoku: 'Japanese multi-signal indicator. Tenkan/Kijun cross shows momentum; cloud position shows trend bias. Price above cloud = bullish, inside = indecisive, below = bearish.',
+  vwap: 'Volume-Weighted Average Price — the "fair value" for the period. Institutions use this as a benchmark. Price above = buyers in control.',
+
+  // Momentum indicators
+  rsi: 'Relative Strength Index (0-100). Above 70 = overbought (may pull back). Below 30 = oversold (may bounce). Divergences between RSI and price signal reversals.',
+  macd: 'Moving Average Convergence Divergence. Histogram shows momentum strength. Bullish crossover = MACD line crosses above signal. Watch for divergences.',
+  stochRsi: 'Stochastic RSI — an oscillator of RSI, more sensitive to short-term moves. K/D crossovers above 80 (overbought) or below 20 (oversold) are highest-probability signals.',
+  adx: 'Average Directional Index — measures trend strength (not direction). Above 40 = strong trend, 20-40 = moderate, below 20 = weak/ranging. +DI vs -DI shows direction.',
+
+  // Volatility
+  bollinger: 'Price envelope: 2 standard deviations around a 20-period SMA. Squeeze (narrow bands) often precedes a breakout. Price at upper band = extended, lower band = compressed.',
+  atr: 'Average True Range — volatility in dollar terms over 14 periods. Higher ATR means wider stop losses are needed. Used to calculate position sizing and leverage.',
+  volRegime: 'Classifies current volatility: "Low Vol Squeeze" = breakout likely, "Normal" = typical conditions, "Elevated"/"Extreme" = high volatility, wider ranges expected.',
+
+  // Volume
+  volume: 'Current bar\'s trading volume compared to the 20-bar average. Spikes (>1.5x average) confirm price moves — strong volume validates the signal.',
+  obv: 'On-Balance Volume — running total of volume flow. Rising OBV + rising price = strong trend. Divergence between OBV and price warns of weakening momentum.',
+
+  // Market Structure (SMC)
+  smcStructure: 'Smart Money Concepts (SMC) overall market structure. Determined by the pattern of Break of Structure and Change of Character events.',
+  bos: 'Break of Structure — price breaks a prior swing high (bullish) or swing low (bearish), confirming the current trend is continuing.',
+  choch: 'Change of Character — the first break against the prevailing trend. Signals a potential trend reversal. More significant on higher timeframes.',
+  fvg: 'Fair Value Gaps — imbalances where a candle\'s range doesn\'t overlap with two candles prior. Price often returns to fill these gaps. Acts as support/resistance.',
+  orderBlocks: 'Institutional supply/demand zones — the last opposing candle before a strong impulsive move. Smart money accumulates/distributes here.',
+  liquidity: 'Clusters of stop losses resting above swing highs (buy-side) or below swing lows (sell-side). Smart money hunts these levels to fill large orders. "Equal Highs" (EQH) = multiple swing highs at the same price, creating a pool of buy stops above. "Equal Lows" (EQL) = multiple swing lows at the same price, creating sell stops below. These are high-probability liquidity sweep targets.',
+  divergences: 'Price makes a new high/low but the indicator doesn\'t confirm — signals weakening momentum. "Regular" divergences signal reversals; "Hidden" signal continuation.',
+
+  // Trade setup fields
+  entry: 'Suggested entry price based on current market structure and signal direction.',
+  stopLoss: 'Maximum risk level. If price hits this, exit the trade to limit losses. Placed beyond key support/resistance using ATR as a buffer.',
+  tps: 'Three take-profit targets for scaling out: 33% at TP1 (conservative), 33% at TP2 (moderate), 34% at TP3 (aggressive). This locks in profits progressively.',
+  riskReward: 'Ratio of potential loss (to stop) vs potential gain (to TP). Higher R:R = better risk-adjusted trade. Aim for at least 2:1.',
+  positionSizing: 'Trade Capital = how much $ you\'re committing to this trade (your margin deposit). Risk at SL = the max $ you\'ll lose if your stop loss fills exactly. Position Size = Risk / SL Distance %. Example: $100 risk with a 4.5% SL distance → $2,222 position. A wider stop = smaller position. A tighter stop = larger position requiring more leverage.',
+  actualRisk: 'Your real risk depends on stop loss execution. "If SL fills exactly" = best case, you lose only your risk amount. "If SL slips 1%" = realistic scenario in volatile markets where your stop fills worse than expected. "If liquidated" = worst case, you lose your full trade capital (margin). Crypto can gap through stops during flash crashes or low liquidity. Never risk more than you can afford to lose.',
+  leverage: '"Needed" = the leverage your position requires (Position / Trade Capital). "ATR max" = the safe maximum based on current volatility (higher volatility = lower safe leverage). "Applied" = the actual leverage used (capped at ATR max). If needed exceeds ATR max, your effective position is smaller than calculated.',
+  liqPrice: 'Liquidation price — where your position is force-closed by the exchange. Keep this far from current price. Higher leverage = closer liquidation.',
+  atrVol: 'Current ATR as a percentage of price. Influences stop loss distance and leverage. High volatility (>3%) means use lower leverage.',
+  confidence: 'How likely this setup plays out (15-95%). Formula: starts with the absolute composite score (e.g. score of +65 → base 65%), then +10% if average R:R exceeds 2:1 (good reward for risk), and +5% if divergences are detected on the 4H timeframe (momentum confirmation). Clamped between 15% (minimum for any signal) and 95% (never 100% certain). Above 70% = high confidence. 50-70% = moderate. Below 50% = speculative.',
+  whatChanged: 'Log of recent setup changes. The setup recalculates every 60 seconds as new candle data arrives. Tracked events: new signal activated (score left neutral zone), direction flipped (LONG↔SHORT), signal strength changed (e.g. LONG→STRONG LONG), entry/SL/TP levels shifted (price moved), and confidence changes (indicators aligned or weakened).',
+
+  // Entry ladder
+  tvChart: 'Interactive TradingView chart with full drawing tools, indicators, and symbol search. Your changes (drawings, indicators, timeframe) auto-save to your browser and persist across reloads. Click "Reset" to restore defaults. Click "Open My Chart" to launch your personal saved layout in a new tab.',
+  entryLadder: 'Instead of one "all-in" entry, split your position across 3 price zones. "Aggressive" (25%) enters slightly ahead of the level to beat front-runners. "Target" (50%) is the primary calculated entry. "Deep" (25%) is below/above for a better fill if price overshoots. Weighted average entry is your effective cost basis.',
+  frontRun: 'When entry sits near an obvious level (round number, pivot, major Fibonacci), institutions often front-run it — filling orders just before the level is reached. The "Aggressive" zone offsets by 15% of ATR to beat this. If you see multiple obvious levels clustering near entry, consider putting more allocation in the Aggressive zone.',
+
+  // Entry timing
+  candleCountdown: 'Time remaining on each timeframe\'s candle. Signals are most reliable at candle close — entering mid-candle risks false signals if the candle reverses.',
+  tfAlignment: 'Whether higher timeframes (Daily, Weekly) agree with the trade direction. More alignment = higher conviction signal.',
+  watchFor: 'Pending conditions that would strengthen or invalidate the setup. Monitor these before entering.',
+
+  // Key levels
+  pivots: 'Classic pivot points from prior period\'s high, low, close. R1-R3 are resistance levels (sell pressure). S1-S3 are support levels (buy pressure). PP is the pivot.',
+  fibonacci: 'Fibonacci retracement levels from the swing range. 38.2%, 50%, and 61.8% are the most-watched levels where pullbacks often reverse.',
+  supportResistance: 'Horizontal price levels from swing highs (resistance), swing lows (support), and round numbers. Price tends to react at these levels.',
+
+  // Confluence meter details
+  tfWeights: 'Higher timeframes are weighted more: Weekly 5x, Daily 4x, 4H 3x, 1H 2x, 15m 1x. This prevents noise from short-term fluctuations.',
+  weightedTotal: 'Final composite score combining all timeframe signals by weight. Determines signal strength: ±60-100 = strong, ±20-60 = moderate, ±0-20 = neutral.',
+  adxMult: 'ADX multiplier amplifies a timeframe\'s score when trend is strong (ADX > 20). Stronger trends get up to 1.5x multiplier, rewarding conviction.',
+
+  // Journal
+  winRate: 'Percentage of closed trades that were winners. Track this over time to measure your edge.',
+  avgPnl: 'Average profit or loss percentage across all closed trades. Positive = profitable system overall.',
+  avgRR: 'Average risk:reward ratio for winning trades only. Shows how much you capture on winners.',
+};
+
+function Tip({k}) {
+  const text = TIPS[k];
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState(null);
+  const iconRef = useRef(null);
+  const bubbleRef = useRef(null);
+  if (!text) return null;
+  const onEnter = () => { setPos(null); setShow(true); };
+  const onLeave = () => { setShow(false); setPos(null); };
+  useEffect(() => {
+    if (!show || !iconRef.current || !bubbleRef.current) return;
+    const r = iconRef.current.getBoundingClientRect();
+    const bb = bubbleRef.current.getBoundingClientRect();
+    const bw = 280;
+    const iconCenter = r.left + r.width / 2;
+    let left = iconCenter - bw / 2;
+    // clamp to viewport edges
+    if (left < 8) left = 8;
+    if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
+    // arrow should point at the icon center relative to the bubble
+    const arrow = Math.max(12, Math.min(bw - 12, iconCenter - left));
+    // vertical: prefer above, fall back to below
+    let top, dir;
+    if (r.top - bb.height - 10 < 0) {
+      top = r.bottom + 8; dir = 'below';
+    } else {
+      top = r.top - bb.height - 8; dir = 'above';
+    }
+    setPos({top, left, dir, arrow});
+  }, [show]);
+  return (
+    <>
+      <span className="info-tip" ref={iconRef} onMouseEnter={onEnter} onMouseLeave={onLeave}>?</span>
+      {show && ReactDOM.createPortal(
+        <div ref={bubbleRef}
+          className={`info-bubble-fixed ${pos ? pos.dir : 'above'} ${pos ? '' : 'positioning'}`}
+          style={pos ? {top:pos.top, left:pos.left, '--arrow':pos.arrow+'px'} : {top:-9999, left:-9999}}>
+          {text}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+
+// ── Header ──
+function Header({livePrice, change24h, lastRefresh, sessions, onRefresh, status}) {
+  return (
+    <div className="header">
+      <h2 style={{fontSize:18,letterSpacing:'-0.5px'}}>BTC Signal Desk</h2>
+      {livePrice != null && (
+        <span className="pulse" style={{fontSize:16,fontWeight:700,color:'var(--bull)',fontFamily:'JetBrains Mono'}}>
+          ${livePrice.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+        </span>
+      )}
+      {change24h != null && (
+        <span style={{fontSize:12,fontWeight:600}} className={change24h >= 0 ? 'bull' : 'bear'}>
+          {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
+        </span>
+      )}
+      <div style={{display:'flex',gap:6,alignItems:'center',marginLeft:8}}>
+        {sessions.map(s => (
+          <span key={s.name} style={{fontSize:10,color:s.color,display:'flex',alignItems:'center',gap:3}}>
+            <span className="session-dot" style={{background:s.color}}></span>{s.name}
+          </span>
+        ))}
+      </div>
+      <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,fontSize:11,color:'var(--muted)'}}>
+        {lastRefresh && <span>Updated {lastRefresh.toLocaleTimeString()}</span>}
+        <button className="btn" onClick={onRefresh}>Refresh</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Confluence Meter ──
+function ConfluenceMeter({tfScores, composite}) {
+  const barColor = v => v > 20 ? 'var(--bull)' : v < -20 ? 'var(--bear)' : 'var(--accent)';
+  const sigColor = {'STRONG LONG':'var(--bull)','LONG':'var(--bull)','NEUTRAL':'var(--accent)','SHORT':'var(--bear)','STRONG SHORT':'var(--bear)'};
+  return (
+    <div className="card">
+      <div className="card-head" style={{cursor:'default'}}>
+        <span>Confluence Score <Tip k="confluence" /></span>
+        <span className="badge" style={{background: composite.score > 20 ? 'var(--bull-bg)' : composite.score < -20 ? 'var(--bear-bg)' : 'var(--accent-bg)', color: sigColor[composite.signal], borderColor: sigColor[composite.signal], borderWidth:1, borderStyle:'solid'}}>
+          {composite.signal} ({composite.score > 0 ? '+' : ''}{composite.score})
+        </span>
+      </div>
+      <div className="card-body">
+        {TIMEFRAMES.map(tf => {
+          const s = tfScores[tf];
+          if (!s) return null;
+          const pct = ((s.score + 100) / 200) * 100;
+          return (
+            <div key={tf} style={{marginBottom:6}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:2}}>
+                <span style={{color:'var(--dim)'}}>{TF_LABELS[tf]} <span style={{color:'var(--muted)'}}>({TF_WEIGHTS[tf]}x){tf === '1w' && <Tip k="tfWeights" />}</span></span>
+                <span style={{color:barColor(s.score),fontWeight:600}}>{s.score > 0 ? '+' : ''}{s.score}</span>
+              </div>
+              <div className="meter-bar">
+                <div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:'var(--border2)'}}></div>
+                <div className="meter-fill" style={{width:`${pct}%`,background:barColor(s.score),opacity:0.7}}></div>
+              </div>
+            </div>
+          );
+        })}
+        <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',fontSize:11}}>
+          <span style={{fontWeight:600,color:'var(--text)'}}>Weighted Total <Tip k="weightedTotal" /></span>
+          <span style={{fontWeight:700,fontSize:14,color:sigColor[composite.signal]}}>{composite.score > 0 ? '+' : ''}{composite.score}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Trade Setup Card ──
+function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskChange, composite, setupChanges}) {
+  if (!setup) return (
+    <div className="card" style={{opacity:0.6}}>
+      <div className="card-head" style={{cursor:'default'}}>Trade Setup</div>
+      <div className="card-body">
+        <div style={{textAlign:'center',padding:20,color:'var(--muted)'}}>
+          No active setup — score in neutral zone ({composite?.score ?? 0})
+        </div>
+        {setupChanges?.length > 0 && (
+          <div style={{marginTop:8,borderTop:'1px solid var(--border)',paddingTop:8}}>
+            <div className="sub-h" style={{display:'flex',alignItems:'center',gap:4}}>
+              Recent Changes <Tip k="whatChanged" />
+            </div>
+            {setupChanges.slice(0,5).map((c, i) => {
+              const icon = c.type === 'new' ? '\u25B6' : c.type === 'flip' ? '\u21C4' : c.type === 'cleared' ? '\u25A0' : c.type === 'strength' ? '\u2191' : c.type === 'confidence' ? '\u25CF' : '\u2022';
+              const color = c.type === 'new' ? 'var(--bull)' : c.type === 'flip' ? 'var(--warn)' : c.type === 'cleared' ? 'var(--bear)' : 'var(--accent)';
+              return (
+                <div key={i} style={{display:'flex',gap:8,padding:'4px 0',borderBottom:'1px solid var(--border)',fontSize:11}}>
+                  <span style={{color,fontSize:10,marginTop:2}}>{icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{color:'var(--text)'}}>{c.text}</div>
+                    <div style={{color:'var(--muted)',fontSize:10}}>{c.detail}</div>
+                  </div>
+                  <span style={{color:'var(--muted)',fontSize:9}}>{c.ts}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+  const isLong = setup.direction === 'LONG';
+  const glowCls = isLong ? 'glow-bull' : 'glow-bear';
+  const dirColor = isLong ? 'var(--bull)' : 'var(--bear)';
+
+  const copyPlan = () => {
+    const txt = [
+      `BTC ${setup.direction} SETUP`,
+      `Generated: ${new Date().toLocaleString()}`,
+      ``,
+      `Entry: $${setup.entry.toFixed(2)}`,
+      `Stop Loss: $${setup.sl.toFixed(2)} (${setup.slPct.toFixed(2)}%)`,
+      `TP1 (33%): $${setup.tps[0].price.toFixed(2)} (R:R ${setup.rr[0].toFixed(1)})`,
+      `TP2 (33%): $${setup.tps[1].price.toFixed(2)} (R:R ${setup.rr[1].toFixed(1)})`,
+      `TP3 (34%): $${setup.tps[2].price.toFixed(2)} (R:R ${setup.rr[2].toFixed(1)})`,
+      ``,
+      `Trade Capital: $${tradeCapital} | Risk at SL: $${riskAmt}`,
+      `Position: $${setup.posSizeUSD.toFixed(2)} (${setup.posSizeBTC.toFixed(6)} BTC)`,
+      `Leverage: ${setup.lev}x (needed ${setup.levNeeded}x) | Margin: $${setup.margin.toFixed(2)}`,
+      `Liquidation: $${setup.liqPrice.toFixed(2)}`,
+      `Confidence: ${setup.confidence}% | Composite: ${composite.score}`,
+      ``,
+      `⚠️ Algorithmic analysis, not a recommendation. DYOR.`
+    ].join('\n');
+    navigator.clipboard.writeText(txt).then(() => alert('Trade plan copied to clipboard!'));
+  };
+
+  // R:R bar
+  const totalDist = Math.abs(setup.tps[2].price - setup.sl);
+  const slWidth = totalDist > 0 ? (setup.slDist / totalDist) * 100 : 20;
+  const tpWidth = 100 - slWidth;
+
+  return (
+    <div className={`card ${glowCls} fade-in`}>
+      <div className="card-head" style={{cursor:'default'}}>
+        <span>Active Trade Setup <Tip k="tradeSetup" /></span>
+        <span className={`badge ${isLong ? 'badge-bull' : 'badge-bear'}`}>{setup.direction}</span>
+      </div>
+      <div className="card-body">
+        {/* Prices + Dollar P&L */}
+        {(() => {
+          const dir = isLong ? 1 : -1;
+          const posBTC = setup.posSizeBTC;
+          const slPnl = dir * (setup.sl - setup.entry) * posBTC;
+          const tpPnls = setup.tps.map((tp, i) => {
+            const portion = posBTC * (tp.pct / 100);
+            return dir * (tp.price - setup.entry) * portion;
+          });
+          const totalIfAllTP = tpPnls.reduce((s,v) => s+v, 0);
+          return (
+            <table style={{marginBottom:8}}>
+              <thead><tr><th>Level</th><th>Price</th><th style={{textAlign:'right'}}>P&L</th><th></th></tr></thead>
+              <tbody>
+                <tr><td className="muted">Entry <Tip k="entry" /></td><td style={{color:'var(--text)',fontWeight:600}}>{fmtP(setup.entry)}</td><td></td><td className="muted" style={{fontSize:10}}>Current: {fmtP(setup.price)}</td></tr>
+                <tr style={{background:'var(--bear-bg)'}}>
+                  <td className="bear">Stop Loss <Tip k="stopLoss" /></td>
+                  <td className="bear" style={{fontWeight:600}}>{fmtP(setup.sl)}</td>
+                  <td className="bear" style={{textAlign:'right',fontWeight:700}}>{slPnl < 0 ? '-' : '+'}${Math.abs(slPnl).toFixed(2)}</td>
+                  <td className="muted" style={{fontSize:10}}>-{fmt(setup.slPct)}%</td>
+                </tr>
+                {setup.tps.map((tp, i) => (
+                  <tr key={i} style={{background:'var(--bull-bg)'}}>
+                    <td className="bull">{tp.label} ({tp.pct}%){i === 0 && <Tip k="tps" />}</td>
+                    <td className="bull" style={{fontWeight:600}}>{fmtP(tp.price)}</td>
+                    <td className="bull" style={{textAlign:'right',fontWeight:700}}>+${tpPnls[i].toFixed(2)}</td>
+                    <td className="muted" style={{fontSize:10}}>R:R {fmt(setup.rr[i],1)}</td>
+                  </tr>
+                ))}
+                <tr style={{borderTop:'1px solid var(--border2)'}}>
+                  <td className="muted" style={{fontWeight:600}}>All TPs Hit</td>
+                  <td></td>
+                  <td className="bull" style={{textAlign:'right',fontWeight:700,fontSize:12}}>+${totalIfAllTP.toFixed(2)}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          );
+        })()}
+
+        {/* R:R Bar */}
+        <div style={{marginBottom:10}}>
+          <div style={{fontSize:10,color:'var(--muted)',marginBottom:3}}>Risk : Reward <Tip k="riskReward" /></div>
+          <div className="rr-bar">
+            <div className="rr-sl" style={{width:`${Math.max(slWidth, 10)}%`}}>SL</div>
+            <div className="rr-tp" style={{width:`${Math.max(tpWidth, 10)}%`}}>Avg R:R {fmt(setup.avgRR,1)}</div>
+          </div>
+        </div>
+
+        {/* Position Sizing */}
+        {(() => {
+          const marginExceedsCapital = setup.margin > tradeCapital;
+          const riskExceedsCapital = riskAmt > tradeCapital;
+          const riskPctOfCapital = tradeCapital > 0 ? (riskAmt / tradeCapital * 100).toFixed(1) : 0;
+          return (<>
+            <div className="sub-h">Position Sizing <Tip k="positionSizing" /></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
+              <div>
+                <div style={{fontSize:11,color:'var(--muted)',marginBottom:2}}>Trade Capital</div>
+                <input className="input" type="number" value={tradeCapital} onChange={e => onCapitalChange(+e.target.value)} style={{width:'100%'}} />
+                <div style={{fontSize:9,color:'var(--muted)',marginTop:2}}>$ you're putting up</div>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:'var(--muted)',marginBottom:2}}>Risk at Stop Loss</div>
+                <input className="input" type="number" value={riskAmt} onChange={e => onRiskChange(+e.target.value)} min="10" step="10" style={{width:'100%'}} />
+                <div style={{fontSize:9,color: riskExceedsCapital ? 'var(--bear)' : 'var(--muted)',marginTop:2}}>{riskPctOfCapital}% of capital{riskExceedsCapital ? ' — exceeds capital!' : ''}</div>
+              </div>
+            </div>
+
+            {/* Show the formula transparently */}
+            <div style={{background:'var(--card2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 12px',marginBottom:8,fontSize:12}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                <span style={{color:'var(--muted)'}}>Max Loss at SL</span>
+                <span style={{color:'var(--bear)',fontWeight:600}}>{fmtP(riskAmt)}</span>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                <span style={{color:'var(--muted)'}}>SL Distance</span>
+                <span style={{color:'var(--bear)',fontWeight:500}}>{fmtP(setup.slDist)} ({fmt(setup.slPct,2)}%)</span>
+              </div>
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:6,marginTop:2}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{color:'var(--dim)'}}>Position Size</span>
+                  <span style={{color:'var(--text)',fontWeight:700,fontSize:14}}>{fmtP(setup.posSizeUSD)}</span>
+                </div>
+                <div style={{color:'var(--muted)',fontSize:10,textAlign:'right',marginTop:2}}>{fmtP(riskAmt)} / {fmt(setup.slPct,2)}% = {fmtP(setup.posSizeUSD)} ({fmt(setup.posSizeBTC,6)} BTC)</div>
+              </div>
+            </div>
+
+            {/* Actual Risk */}
+            <div style={{background:'var(--warn-bg)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:6,padding:'8px 10px',marginBottom:8,fontSize:11,lineHeight:1.5}}>
+              <div style={{color:'var(--warn)',fontWeight:600,marginBottom:4,fontSize:12}}>Actual Risk <Tip k="actualRisk" /></div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                <span style={{color:'var(--dim)'}}>If SL fills exactly</span>
+                <span style={{color:'var(--bear)',fontWeight:600}}>-{fmtP(riskAmt)}</span>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                <span style={{color:'var(--dim)'}}>If SL slips 1%</span>
+                <span style={{color:'var(--bear)',fontWeight:600}}>-{fmtP(riskAmt + setup.posSizeUSD * 0.01)}</span>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between'}}>
+                <span style={{color:'var(--dim)'}}>If liquidated (max loss)</span>
+                <span style={{color:'var(--bear)',fontWeight:700}}>-{fmtP(Math.min(setup.margin, tradeCapital))}</span>
+              </div>
+            </div>
+
+            {/* Leverage */}
+            <div className="sub-h" style={{marginTop:8}}>Leverage <Tip k="leverage" /></div>
+            <table style={{fontSize:12}}>
+              <tbody>
+                <tr>
+                  <td className="muted">Needed</td>
+                  <td style={{color: setup.levWarning ? 'var(--bear)' : 'var(--text)', fontWeight:600}}>
+                    {setup.levNeeded}x
+                    {setup.levWarning && <span className="bear" style={{fontWeight:400,fontSize:10}}> exceeds safe max ({setup.maxLev}x)</span>}
+                  </td>
+                </tr>
+                <tr><td className="muted">Applied</td><td style={{color:'var(--text)',fontWeight:600}}>{setup.lev}x <span className="muted" style={{fontWeight:400}}>(ATR max {setup.maxLev}x)</span></td></tr>
+                <tr><td className="muted">Margin Required</td><td style={{color: marginExceedsCapital ? 'var(--bear)' : 'var(--text)', fontWeight: marginExceedsCapital ? 700 : 400}}>{fmtP(setup.margin)}</td></tr>
+                <tr>
+                  <td className={setup.lev > 3 ? 'warn' : 'muted'}>Liquidation Price <Tip k="liqPrice" /></td>
+                  <td className={setup.lev > 3 ? 'warn' : ''}>{fmtP(setup.liqPrice)}</td>
+                </tr>
+                <tr><td className="muted">ATR Volatility <Tip k="atrVol" /></td><td>{fmt(setup.atrPct)}%</td></tr>
+              </tbody>
+            </table>
+
+            {/* Warnings */}
+            {marginExceedsCapital && (
+              <div style={{color:'var(--bear)',fontSize:11,marginTop:6,display:'flex',gap:4,alignItems:'flex-start',fontWeight:600}}>
+                <span style={{flexShrink:0}}>&#9888;</span>
+                <span>Margin ({fmtP(setup.margin)}) exceeds your trade capital ({fmtP(tradeCapital)}). Increase capital or reduce risk amount.</span>
+              </div>
+            )}
+            {setup.levWarning && !marginExceedsCapital && (
+              <div style={{color:'var(--warn)',fontSize:11,marginTop:6,display:'flex',gap:4,alignItems:'flex-start'}}>
+                <span style={{flexShrink:0}}>&#9888;</span>
+                <span>Needed leverage ({setup.levNeeded}x) exceeds ATR-safe maximum ({setup.maxLev}x). Applied {setup.lev}x instead — actual risk may differ.</span>
+              </div>
+            )}
+          </>);
+        })()}
+
+        {/* Confidence */}
+        {(() => {
+          const conf = setup.confidence;
+          const confLabel = conf >= 70 ? 'HIGH' : conf >= 50 ? 'MODERATE' : 'SPECULATIVE';
+          const confColor = conf >= 70 ? 'var(--bull)' : conf >= 50 ? 'var(--warn)' : 'var(--bear)';
+          const confBg = conf >= 70 ? 'var(--bull-bg)' : conf >= 50 ? 'var(--warn-bg)' : 'var(--bear-bg)';
+          const confDim = conf >= 70 ? 'var(--bull-dim)' : conf >= 50 ? 'rgba(245,158,11,0.3)' : 'var(--bear-dim)';
+          const abScore = Math.abs(composite.score);
+          const rrBonus = setup.avgRR > 2;
+          const divBonus = conf > abScore + (rrBonus ? 10 : 0);
+          return (
+            <div style={{marginTop:12,padding:'12px 14px',background:confBg,border:`1px solid ${confDim}`,borderRadius:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <span style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>Confidence <Tip k="confidence" /></span>
+                <div style={{display:'flex',alignItems:'baseline',gap:6}}>
+                  <span className="badge" style={{background:confBg,color:confColor,border:`1px solid ${confColor}`,fontSize:10}}>{confLabel}</span>
+                  <span style={{fontSize:22,fontWeight:700,color:confColor,fontFamily:'JetBrains Mono'}}>{conf}%</span>
+                </div>
+              </div>
+              <div className="meter-bar" style={{height:8,marginBottom:8}}>
+                <div className="meter-fill" style={{width:`${conf}%`,background:confColor,opacity:0.85}}></div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:3,fontSize:11}}>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <span style={{color:'var(--dim)'}}>Composite score magnitude</span>
+                  <span style={{color:'var(--text)',fontWeight:600}}>{abScore}%</span>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <span style={{color:'var(--dim)'}}>R:R bonus ({'>'} 2:1)</span>
+                  <span style={{color: rrBonus ? 'var(--bull)' : 'var(--muted)', fontWeight:600}}>{rrBonus ? '+10%' : '—'}</span>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <span style={{color:'var(--dim)'}}>4H divergence bonus</span>
+                  <span style={{color: divBonus ? 'var(--bull)' : 'var(--muted)', fontWeight:600}}>{divBonus ? '+5%' : '—'}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* What Changed */}
+        {setupChanges?.length > 0 && (
+          <div style={{marginTop:12}}>
+            <div className="sub-h" style={{display:'flex',alignItems:'center',gap:4}}>
+              What Changed <Tip k="whatChanged" />
+            </div>
+            <div style={{maxHeight:160,overflowY:'auto',paddingRight:4}}>
+              {setupChanges.slice(0,10).map((c, i) => {
+                const icon = c.type === 'new' ? '\u25B6' : c.type === 'flip' ? '\u21C4' : c.type === 'cleared' ? '\u25A0' : c.type === 'strength' ? '\u2191' : c.type === 'confidence' ? '\u25CF' : '\u2022';
+                const color = c.type === 'new' ? 'var(--bull)' : c.type === 'flip' ? 'var(--warn)' : c.type === 'cleared' ? 'var(--bear)' : 'var(--accent)';
+                return (
+                  <div key={i} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:'1px solid var(--border)',alignItems:'flex-start',fontSize:12}}>
+                    <span style={{color,fontSize:11,marginTop:2,flexShrink:0}}>{icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{color:'var(--text)',fontWeight:500}}>{c.text}</div>
+                      <div style={{color:'var(--muted)',fontSize:11,marginTop:1}}>{c.detail}</div>
+                    </div>
+                    <span style={{color:'var(--muted)',fontSize:10,flexShrink:0,whiteSpace:'nowrap'}}>{c.ts}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Disclaimer + Copy */}
+        <div style={{marginTop:10,display:'flex',gap:6}}>
+          <button className={`btn ${isLong ? 'btn-bull' : 'btn-bear'}`} style={{flex:1}} onClick={copyPlan}>Copy Trade Plan</button>
+        </div>
+        <div style={{fontSize:9,color:'var(--muted)',marginTop:6,lineHeight:1.4}}>
+          This is an algorithmic analysis, not a recommendation. Verify all levels on your own charts before trading.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Timeframe Analysis Panel ──
+function TFPanel({tf, ind, smc}) {
+  if (!ind) return null;
+  const pa = v => ind.price > v ? 'bull' : 'bear';
+  return (
+    <div className="fade-in" style={{fontSize:11}}>
+      {/* TREND */}
+      <div className="sub-h">Trend <Tip k="ema" /></div>
+      <table><tbody>
+        {[9,21,50,100,200].map(p => (
+          <tr key={p}><td className="muted">EMA {p}</td><td>{fmtP(ind.ema[p])}</td><td className={ind.ema[p]!=null?pa(ind.ema[p]):'muted'}>{ind.ema[p]!=null?(ind.price>ind.ema[p]?'Above':'Below'):'—'}</td></tr>
+        ))}
+        <tr><td className="muted">SMA 50/200 <Tip k="sma50200" /></td><td>{fmtP(ind.sma[50])}/{fmtP(ind.sma[200])}</td><td className={ind.cross.includes('Bullish')||ind.cross==='Golden Cross'?'bull':'bear'}>{ind.cross}</td></tr>
+        <tr><td className="muted">Ichimoku <Tip k="ichimoku" /></td><td className="muted">T:{fmtP(ind.ichimoku.tenkan)} K:{fmtP(ind.ichimoku.kijun)}</td><td className={ind.ichimoku.pos==='Above Cloud'?'bull':ind.ichimoku.pos==='Below Cloud'?'bear':'warn'}>{ind.ichimoku.pos} | {ind.ichimoku.tkX}</td></tr>
+        <tr><td className="muted">VWAP <Tip k="vwap" /></td><td>{fmtP(ind.vwap)}</td><td className={ind.vwap!=null?pa(ind.vwap):'muted'}>{ind.vwap!=null?(ind.price>ind.vwap?'Above':'Below'):'—'}</td></tr>
+      </tbody></table>
+
+      {/* MOMENTUM */}
+      <div className="sub-h" style={{marginTop:8}}>Momentum</div>
+      <table><tbody>
+        <tr><td className="muted">RSI (14) <Tip k="rsi" /></td><td className={rCls(ind.rsi)}>{fmt(ind.rsi,1)}</td><td className={rCls(ind.rsi)}>{ind.rsi!=null?(ind.rsi>70?'Overbought':ind.rsi<30?'Oversold':'Neutral'):'—'}</td></tr>
+        <tr><td className="muted">MACD <Tip k="macd" /></td><td className={ind.macd.line>0?'bull':'bear'}>{fmt(ind.macd.line)}</td><td className={ind.macd.xover==='Bullish'?'bull':'bear'}>{ind.macd.xover} (H:{fmt(ind.macd.hist)})</td></tr>
+        <tr><td className="muted">Stoch RSI <Tip k="stochRsi" /></td><td className={sCls(ind.stochRSI.k)}>K:{fmt(ind.stochRSI.k,1)} D:{fmt(ind.stochRSI.d,1)}</td><td className={sCls(ind.stochRSI.k)}>{ind.stochRSI.k!=null?(ind.stochRSI.k>80?'Overbought':ind.stochRSI.k<20?'Oversold':'Neutral'):'—'}</td></tr>
+        <tr><td className="muted">ADX <Tip k="adx" /></td><td>{fmt(ind.adx.val,1)}</td><td className={ind.adx.val>40?'bull':ind.adx.val>20?'warn':'muted'}>{ind.adx.val!=null?(ind.adx.val>40?'Strong':ind.adx.val>20?'Moderate':'Weak'):'—'} +DI:{fmt(ind.adx.pDI,0)} -DI:{fmt(ind.adx.mDI,0)}</td></tr>
+      </tbody></table>
+
+      {/* VOLATILITY */}
+      <div className="sub-h" style={{marginTop:8}}>Volatility</div>
+      <table><tbody>
+        <tr><td className="muted">Bollinger <Tip k="bollinger" /></td><td>U:{fmtP(ind.bb.upper)} L:{fmtP(ind.bb.lower)}</td><td className={ind.bb.squeeze?'warn':'muted'}>BW:{fmt(ind.bb.bw)}% {ind.bb.squeeze?'SQUEEZE':''}</td></tr>
+        <tr><td className="muted">ATR (14) <Tip k="atr" /></td><td>{fmtP(ind.atr.val)}</td><td>{fmt(ind.atr.pct)}% of price</td></tr>
+        <tr><td className="muted">Vol Regime <Tip k="volRegime" /></td><td colSpan="2"><span className={`badge ${ind.volRegime==='Low Vol Squeeze'?'badge-warn':ind.volRegime==='Extreme Expansion'?'badge-bear':'badge-neutral'}`}>{ind.volRegime}</span></td></tr>
+      </tbody></table>
+
+      {/* VOLUME */}
+      <div className="sub-h" style={{marginTop:8}}>Volume</div>
+      <table><tbody>
+        <tr><td className="muted">Volume <Tip k="volume" /></td><td>{fmtK(ind.volume)}</td><td className={ind.volRatio>1.5?'warn':'muted'}>{fmt(ind.volRatio)}x avg {ind.volRatio>1.5?'SPIKE':''}</td></tr>
+        <tr><td className="muted">OBV <Tip k="obv" /></td><td>{fmtK(ind.obv)}</td><td className={ind.obv>ind.obvPrev?'bull':'bear'}>{ind.obv>ind.obvPrev?'Rising':'Falling'}</td></tr>
+      </tbody></table>
+
+      {/* SMC */}
+      {smc && <>
+        <div className="sub-h" style={{marginTop:8}}>Market Structure (SMC) <Tip k="smcStructure" /></div>
+        <table><tbody>
+          <tr><td className="muted">Structure</td><td colSpan="2"><span className={`badge ${smc.structure==='bullish'?'badge-bull':smc.structure==='bearish'?'badge-bear':'badge-neutral'}`}>{smc.structure.toUpperCase()}</span></td></tr>
+          {smc.lastBOS && <tr><td className="muted">Last BOS <Tip k="bos" /></td><td className={smc.lastBOS.type==='bullish'?'bull':'bear'}>{smc.lastBOS.type}</td><td>{fmtP(smc.lastBOS.price)}</td></tr>}
+          {smc.lastCHOCH && <tr><td className="warn">Last CHOCH <Tip k="choch" /></td><td className="warn">{smc.lastCHOCH.from} → {smc.lastCHOCH.type}</td><td>{fmtP(smc.lastCHOCH.price)}</td></tr>}
+          <tr><td className="muted">Swings</td><td colSpan="2">{smc.stats.swH} highs / {smc.stats.swL} lows</td></tr>
+          <tr><td className="muted">BOS Events</td><td colSpan="2">{smc.stats.bosN} total</td></tr>
+        </tbody></table>
+
+        {/* FVGs */}
+        {smc.fvgs.length > 0 && <>
+          <div className="sub-h" style={{marginTop:8}}>Fair Value Gaps (Unfilled) <Tip k="fvg" /></div>
+          <table><thead><tr><th>Type</th><th>Zone</th><th>Gap</th></tr></thead><tbody>
+            {smc.fvgs.slice(0,5).map((f,i) => (
+              <tr key={i}><td className={f.type==='bullish'?'bull':'bear'}>{f.type}</td><td>{fmtP(f.bot)} — {fmtP(f.top)}</td><td>{fmtP(f.top - f.bot)}</td></tr>
+            ))}
+          </tbody></table>
+        </>}
+
+        {/* Order Blocks */}
+        {smc.obs.length > 0 && <>
+          <div className="sub-h" style={{marginTop:8}}>Order Blocks <Tip k="orderBlocks" /></div>
+          <table><thead><tr><th>Type</th><th>Zone</th></tr></thead><tbody>
+            {smc.obs.slice(0,5).map((o,i) => (
+              <tr key={i}><td className={o.type==='bullish'?'bull':'bear'}>{o.type}</td><td>{fmtP(o.low)} — {fmtP(o.high)}</td></tr>
+            ))}
+          </tbody></table>
+        </>}
+
+        {/* Liquidity */}
+        {smc.liq.length > 0 && <>
+          <div className="sub-h" style={{marginTop:8}}>Liquidity Levels <Tip k="liquidity" /></div>
+          <table><thead><tr><th>Type</th><th>Price</th></tr></thead><tbody>
+            {smc.liq.slice(0,5).map((l,i) => (
+              <tr key={i}><td className="warn">{l.type.replace('_',' ')}</td><td>{fmtP(l.price)}</td></tr>
+            ))}
+          </tbody></table>
+        </>}
+
+        {/* Divergences */}
+        {smc.divs.length > 0 && <>
+          <div className="sub-h" style={{marginTop:8}}>Divergences Detected <Tip k="divergences" /></div>
+          <table><thead><tr><th>Type</th><th>Indicator</th><th>Detail</th></tr></thead><tbody>
+            {smc.divs.map((d,i) => (
+              <tr key={i}><td className={d.type.includes('Bullish')?'bull':'bear'}>{d.type}</td><td>{d.ind}</td><td className="muted" style={{whiteSpace:'normal',fontSize:10}}>{d.desc}</td></tr>
+            ))}
+          </tbody></table>
+        </>}
+      </>}
+    </div>
+  );
+}
+
+// ── TradingView Chart ──
+const TV_STORAGE_KEY = 'btc_signal_desk_tv_state';
+function TradingViewChart() {
+  const containerRef = React.useRef(null);
+  const widgetRef = React.useRef(null);
+  const MY_CHART_URL = 'https://www.tradingview.com/chart/bKlJWA5U/';
+
+  const resetChart = () => {
+    try { localStorage.removeItem(TV_STORAGE_KEY); } catch(e) {}
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+      widgetRef.current = null;
+    }
+    initWidget();
+  };
+
+  const initWidget = () => {
+    if (!window.TradingView || !containerRef.current) return;
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(TV_STORAGE_KEY)); } catch(e) { return null; } })();
+    const cfg = {
+      container_id: 'tv-chart-container',
+      autosize: true,
+      symbol: 'BINANCE:BTCUSDT',
+      interval: '240',
+      timezone: 'America/New_York',
+      theme: 'dark',
+      style: '1',
+      locale: 'en',
+      toolbar_bg: '#111827',
+      enable_publishing: false,
+      hide_side_toolbar: false,
+      allow_symbol_change: true,
+      studies: ['MAExp@tv-basicstudies', 'RSI@tv-basicstudies', 'MACD@tv-basicstudies'],
+      backgroundColor: '#0a0e17',
+      gridColor: '#1e293b',
+      save_image: false,
+      auto_save_delay: 3,
+    };
+    if (saved) cfg.saved_data = saved;
+    const w = new window.TradingView.widget(cfg);
+    widgetRef.current = w;
+    w.onChartReady && w.onChartReady(() => {
+      try {
+        w.subscribe && w.subscribe('onAutoSaveNeeded', () => {
+          w.save && w.save((state) => {
+            try { localStorage.setItem(TV_STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+          });
+        });
+      } catch(e) {}
+    });
+  };
+
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+    const existing = containerRef.current.querySelector('iframe');
+    if (existing) return;
+    if (window.TradingView) { initWidget(); return; }
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/tv.js';
+    script.async = true;
+    script.onload = initWidget;
+    document.head.appendChild(script);
+    return () => { try { document.head.removeChild(script); } catch(e) {} };
+  }, []);
+
+  return (
+    <div className="card">
+      <div className="card-head" style={{cursor:'default', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <span>TradingView Chart <Tip k="tvChart" /></span>
+        <div style={{display:'flex', alignItems:'center', gap:12}}>
+          <button onClick={resetChart} title="Reset chart to defaults"
+            style={{fontSize:12, color:'#94a3b8', background:'transparent', border:'1px solid #334155', borderRadius:6, padding:'3px 10px', cursor:'pointer'}}>
+            Reset
+          </button>
+          <a href={MY_CHART_URL} target="_blank" rel="noopener noreferrer"
+            style={{fontSize:13, color:'#3b82f6', textDecoration:'none', display:'flex', alignItems:'center', gap:6, fontWeight:600}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Open My Chart
+          </a>
+        </div>
+      </div>
+      <div id="tv-chart-container" ref={containerRef} style={{height:500, background:'#0a0e17', borderRadius:8, overflow:'hidden'}} />
+    </div>
+  );
+}
+
+// ── Bottom panels ──
+function KeyLevelsPanel({ind, smc}) {
+  if (!ind) return null;
+  return (
+    <div className="card">
+      <div className="card-head" style={{cursor:'default'}}>Key Levels <Tip k="keyLevels" /></div>
+      <div className="card-body" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div>
+          <div className="sub-h">Pivot Points <Tip k="pivots" /></div>
+          <table><tbody>
+            <tr><td className="bear">R3</td><td>{fmtP(ind.pivots.r3)}</td></tr>
+            <tr><td className="bear">R2</td><td>{fmtP(ind.pivots.r2)}</td></tr>
+            <tr><td className="bear">R1</td><td>{fmtP(ind.pivots.r1)}</td></tr>
+            <tr><td className="warn">PP</td><td style={{fontWeight:600}}>{fmtP(ind.pivots.pp)}</td></tr>
+            <tr><td className="bull">S1</td><td>{fmtP(ind.pivots.s1)}</td></tr>
+            <tr><td className="bull">S2</td><td>{fmtP(ind.pivots.s2)}</td></tr>
+            <tr><td className="bull">S3</td><td>{fmtP(ind.pivots.s3)}</td></tr>
+          </tbody></table>
+        </div>
+        <div>
+          <div className="sub-h">Fibonacci Retracement <Tip k="fibonacci" /></div>
+          <table><thead><tr><th>Level</th><th>Price</th><th>Dist</th></tr></thead><tbody>
+            {ind.fibs.map(f => (
+              <tr key={f.r}><td className="muted">{(f.r*100).toFixed(1)}%</td><td>{fmtP(f.p)}</td><td className={ind.price>=f.p?'bull':'bear'}>{((ind.price-f.p)/ind.price*100).toFixed(2)}%</td></tr>
+            ))}
+          </tbody></table>
+          {smc?.sr?.length > 0 && <>
+            <div className="sub-h" style={{marginTop:8}}>Support / Resistance <Tip k="supportResistance" /></div>
+            <table><thead><tr><th>Type</th><th>Price</th><th>Source</th></tr></thead><tbody>
+              {smc.sr.slice(0,8).map((l,i) => (
+                <tr key={i}><td className={l.type==='support'?'bull':'bear'}>{l.type}</td><td>{fmtP(l.price)}</td><td className="muted">{l.src}</td></tr>
+              ))}
+            </tbody></table>
+          </>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Confluence Factor Detail ──
+function FactorDetail({tfScores, selectedTF}) {
+  const s = tfScores[selectedTF];
+  if (!s || !s.factors.length) return null;
+  return (
+    <div className="card">
+      <div className="card-head" style={{cursor:'default'}}>
+        <span>Score Factors — {TF_LABELS[selectedTF]} <Tip k="scoreFactors" /></span>
+        <span className="muted" style={{fontSize:10}}>ADX mult: {s.adxMult}x <Tip k="adxMult" /></span>
+      </div>
+      <div className="card-body">
+        <table><thead><tr><th>Factor</th><th style={{textAlign:'right'}}>Pts</th></tr></thead><tbody>
+          {s.factors.map((f,i) => (
+            <tr key={i}><td className="muted" style={{whiteSpace:'normal'}}>{f.label}</td><td style={{textAlign:'right',fontWeight:600}} className={f.pts>0?'bull':f.pts<0?'bear':'muted'}>{f.pts>0?'+':''}{f.pts}</td></tr>
+          ))}
+        </tbody></table>
+      </div>
+    </div>
+  );
+}
+
+// ── Executive Summary ──
+function ExecutiveSummary({setup, composite}) {
+  if (!setup?.summary) return (
+    <div className="card" style={{opacity:0.6}}>
+      <div className="card-head" style={{cursor:'default'}}>Summary <Tip k="summary" /></div>
+      <div className="card-body" style={{padding:16,color:'var(--muted)',fontSize:12,lineHeight:1.6}}>
+        No active signal. The composite score is in the neutral zone ({composite?.score ?? 0}), meaning there is no clear directional bias across timeframes. Wait for stronger alignment before considering a trade.
+      </div>
+    </div>
+  );
+  const isLong = setup.direction === 'LONG';
+  const s = setup.summary;
+  return (
+    <div className="card fade-in" style={{borderLeft:`3px solid ${isLong ? 'var(--bull)' : 'var(--bear)'}`}}>
+      <div className="card-head" style={{cursor:'default'}}>
+        <span>Summary <Tip k="summary" /></span>
+        <span className={`badge ${isLong ? 'badge-bull' : 'badge-bear'}`}>{setup.direction}</span>
+      </div>
+      <div className="card-body" style={{fontSize:12,lineHeight:1.7,color:'var(--dim)'}}>
+        <p style={{fontWeight:600,color:'var(--text)',marginBottom:6,fontSize:13}}>{s.headline}</p>
+        <p style={{marginBottom:6}}>{s.body}</p>
+        <p style={{color: setup.timing?.action === 'ENTER NOW' ? 'var(--bull)' : 'var(--warn)', fontWeight:600, marginBottom:4}}>{s.action}</p>
+        <p style={{color:'var(--muted)',fontSize:11}}>{s.confidence}</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Entry Timing ──
+function EntryTiming({setup}) {
+  if (!setup?.timing) return null;
+  const t = setup.timing;
+  const actionColor = t.action === 'ENTER NOW' ? 'var(--bull)' : t.action === 'SET LIMIT ORDER' ? 'var(--accent)' : 'var(--warn)';
+  return (
+    <div className="card">
+      <div className="card-head" style={{cursor:'default'}}>
+        <span>Entry Timing <Tip k="entryTiming" /></span>
+        <span className="badge" style={{background: t.action === 'ENTER NOW' ? 'var(--bull-bg)' : 'var(--warn-bg)', color: actionColor, border: `1px solid ${actionColor}`}}>
+          {t.action}
+        </span>
+      </div>
+      <div className="card-body" style={{fontSize:11}}>
+        {/* Candle countdowns */}
+        {t.countdowns?.length > 0 && (
+          <div style={{marginBottom:8}}>
+            <div className="sub-h">Candle Close Countdown <Tip k="candleCountdown" /></div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              {t.countdowns.map(c => (
+                <div key={c.tf} style={{background:'var(--card2)',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',textAlign:'center'}}>
+                  <div style={{fontSize:10,color:'var(--muted)'}}>{TF_LABELS[c.tf]}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{c.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Alignment reasons */}
+        {t.reasons.length > 0 && (
+          <div style={{marginBottom:8}}>
+            <div className="sub-h">Timeframe Alignment <Tip k="tfAlignment" /></div>
+            {t.reasons.map((r,i) => (
+              <div key={i} style={{display:'flex',gap:6,marginBottom:3,alignItems:'flex-start'}}>
+                <span style={{color: r.includes('Conflicting') ? 'var(--bear)' : r.includes('confirm') || r.includes('aligned') ? 'var(--bull)' : 'var(--dim)', marginTop:1, fontSize:8}}>&#9679;</span>
+                <span style={{color:'var(--dim)',lineHeight:1.4}}>{r}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pending conditions */}
+        {t.conditions.length > 0 && (
+          <div>
+            <div className="sub-h">Watch For <Tip k="watchFor" /></div>
+            {t.conditions.map((c,i) => (
+              <div key={i} style={{display:'flex',gap:6,marginBottom:3,alignItems:'flex-start'}}>
+                <span style={{color:'var(--accent)',marginTop:1,fontSize:8}}>&#9679;</span>
+                <span style={{color:'var(--dim)',lineHeight:1.4}}>{c}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {t.confirmTF && (
+          <div style={{marginTop:8,padding:'6px 10px',background:'var(--warn-bg)',borderRadius:6,color:'var(--warn)',fontSize:11,lineHeight:1.4}}>
+            Suggested: wait for the {TF_LABELS[t.confirmTF]} candle to close before entering. Mid-candle entries carry higher risk of false signals.
+          </div>
+        )}
+
+        {/* Entry Ladder */}
+        {setup.ladder && (
+          <div style={{marginTop:10}}>
+            <div className="sub-h" style={{display:'flex',alignItems:'center',gap:4}}>Scale-In Ladder <Tip k="entryLadder" /></div>
+            <div style={{background:'var(--card2)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 10px',marginBottom:8}}>
+              <table style={{fontSize:12}}>
+                <thead><tr><th>Zone</th><th>Price</th><th>Allocation</th><th>Rationale</th></tr></thead>
+                <tbody>
+                  {setup.ladder.map((l,i) => (
+                    <tr key={i}>
+                      <td style={{color: l.zone==='Aggressive' ? 'var(--warn)' : l.zone==='Target' ? 'var(--accent)' : 'var(--bull)', fontWeight:600}}>{l.zone}</td>
+                      <td style={{color:'var(--text)',fontWeight:500}}>{fmtP(l.price)}</td>
+                      <td style={{color:'var(--dim)'}}>{l.pct}%</td>
+                      <td style={{color:'var(--muted)',fontSize:11,whiteSpace:'normal'}}>{l.reason}</td>
+                    </tr>
+                  ))}
+                  <tr style={{borderTop:'1px solid var(--border2)'}}>
+                    <td style={{color:'var(--text)',fontWeight:600}}>Avg Entry</td>
+                    <td style={{color:'var(--text)',fontWeight:700}}>{fmtP(setup.weightedEntry)}</td>
+                    <td colSpan="2" style={{color:'var(--muted)',fontSize:11}}>Weighted avg across all 3 zones</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Nearby Obvious Levels */}
+            {setup.nearbyObvious?.length > 0 && (
+              <div style={{background:'var(--warn-bg)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:6,padding:'8px 10px',marginBottom:4,fontSize:11}}>
+                <div style={{color:'var(--warn)',fontWeight:600,marginBottom:4}}>Front-Run Warning <Tip k="frontRun" /></div>
+                <div style={{color:'var(--dim)',marginBottom:4}}>Entry is near obvious levels that may get front-run:</div>
+                {setup.nearbyObvious.map((o,i) => (
+                  <div key={i} style={{display:'flex',gap:6,marginBottom:2}}>
+                    <span style={{color:'var(--warn)'}}>&#9679;</span>
+                    <span style={{color:'var(--text)'}}>{o.level}</span>
+                    <span style={{color:'var(--muted)'}}>({o.type})</span>
+                  </div>
+                ))}
+                <div style={{color:'var(--dim)',marginTop:4,lineHeight:1.4}}>
+                  The "Aggressive" entry ({fmtP(setup.ladder[0].price)}) offsets by {fmtP(setup.frOffset)} (15% of ATR) to get filled before the crowd.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Trade Journal ──
+const JOURNAL_COLS = ['Date','Direction','Entry','Stop Loss','TP1','TP2','TP3','Actual Exit','Outcome','P&L %','R:R Achieved','Confidence','Composite','Notes'];
+
+function journalFromSheet(ws) {
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+  return rows.map((r, i) => ({
+    id: i,
+    date: r['Date'] || '',
+    direction: r['Direction'] || '',
+    entry: +r['Entry'] || 0,
+    sl: +r['Stop Loss'] || 0,
+    tp1: +r['TP1'] || 0,
+    tp2: +r['TP2'] || 0,
+    tp3: +r['TP3'] || 0,
+    actualExit: r['Actual Exit'] !== '' ? +r['Actual Exit'] : null,
+    outcome: r['Outcome'] || 'Pending',
+    pnl: r['P&L %'] !== '' ? +r['P&L %'] : null,
+    rrAchieved: r['R:R Achieved'] !== '' ? +r['R:R Achieved'] : null,
+    confidence: +r['Confidence'] || 0,
+    composite: +r['Composite'] || 0,
+    notes: r['Notes'] || '',
+  }));
+}
+
+function journalToSheet(trades) {
+  const data = trades.map(t => ({
+    'Date': t.date,
+    'Direction': t.direction,
+    'Entry': t.entry,
+    'Stop Loss': t.sl,
+    'TP1': t.tp1,
+    'TP2': t.tp2,
+    'TP3': t.tp3,
+    'Actual Exit': t.actualExit ?? '',
+    'Outcome': t.outcome,
+    'P&L %': t.pnl ?? '',
+    'R:R Achieved': t.rrAchieved ?? '',
+    'Confidence': t.confidence,
+    'Composite': t.composite,
+    'Notes': t.notes,
+  }));
+  return XLSX.utils.json_to_sheet(data, {header: JOURNAL_COLS});
+}
+
+function TradeJournal({trades, onTradesChange, setup, composite}) {
+  const fileRef = useRef(null);
+  const [expanded, setExpanded] = useState(true);
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [editNotes, setEditNotes] = useState('');
+  const [editExit, setEditExit] = useState('');
+
+  const logCurrent = () => {
+    if (!setup) return;
+    const newTrade = {
+      id: Date.now(),
+      date: new Date().toLocaleString(),
+      direction: setup.direction,
+      entry: +setup.entry.toFixed(2),
+      sl: +setup.sl.toFixed(2),
+      tp1: +setup.tps[0].price.toFixed(2),
+      tp2: +setup.tps[1].price.toFixed(2),
+      tp3: +setup.tps[2].price.toFixed(2),
+      actualExit: null,
+      outcome: 'Pending',
+      pnl: null,
+      rrAchieved: null,
+      confidence: setup.confidence,
+      composite: composite?.score ?? 0,
+      notes: `${setup.timing?.action || ''} | ATR ${setup.atrPct?.toFixed(1)}% | Lev ${setup.lev}x`,
+    };
+    onTradesChange([newTrade, ...trades]);
+  };
+
+  const importFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target.result, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const imported = journalFromSheet(ws);
+        onTradesChange([...imported, ...trades]);
+      } catch (err) {
+        alert('Failed to read Excel file: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
+
+  const exportFile = () => {
+    if (!trades.length) return;
+    const ws = journalToSheet(trades);
+    // Column widths
+    ws['!cols'] = JOURNAL_COLS.map(c => ({wch: c === 'Notes' ? 30 : c === 'Date' ? 20 : 12}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Trade Journal');
+    XLSX.writeFile(wb, `BTC_Trade_Journal_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+  const cycleOutcome = (idx) => {
+    const next = {Pending: 'Win', Win: 'Loss', Loss: 'Pending'};
+    const updated = [...trades];
+    updated[idx] = {...updated[idx], outcome: next[updated[idx].outcome] || 'Pending'};
+
+    // Auto-calc P&L if outcome set and exit price exists
+    const t = updated[idx];
+    if (t.outcome !== 'Pending' && t.actualExit) {
+      const dir = t.direction === 'LONG' ? 1 : -1;
+      t.pnl = +((dir * (t.actualExit - t.entry) / t.entry) * 100).toFixed(2);
+      const slDist = Math.abs(t.entry - t.sl);
+      if (slDist > 0) t.rrAchieved = +((Math.abs(t.actualExit - t.entry) / slDist) * (t.pnl >= 0 ? 1 : -1)).toFixed(2);
+    }
+    if (t.outcome === 'Pending') { t.pnl = null; t.rrAchieved = null; }
+    onTradesChange(updated);
+  };
+
+  const startEdit = (idx) => {
+    setEditingIdx(idx);
+    setEditNotes(trades[idx].notes);
+    setEditExit(trades[idx].actualExit ?? '');
+  };
+
+  const saveEdit = () => {
+    if (editingIdx == null) return;
+    const updated = [...trades];
+    const t = {...updated[editingIdx]};
+    t.notes = editNotes;
+    t.actualExit = editExit !== '' ? +editExit : null;
+    // Recalc P&L if exit set and not pending
+    if (t.outcome !== 'Pending' && t.actualExit) {
+      const dir = t.direction === 'LONG' ? 1 : -1;
+      t.pnl = +((dir * (t.actualExit - t.entry) / t.entry) * 100).toFixed(2);
+      const slDist = Math.abs(t.entry - t.sl);
+      if (slDist > 0) t.rrAchieved = +((Math.abs(t.actualExit - t.entry) / slDist) * (t.pnl >= 0 ? 1 : -1)).toFixed(2);
+    }
+    updated[editingIdx] = t;
+    onTradesChange(updated);
+    setEditingIdx(null);
+  };
+
+  const deleteTrade = (idx) => {
+    onTradesChange(trades.filter((_, i) => i !== idx));
+  };
+
+  // Stats
+  const closed = trades.filter(t => t.outcome !== 'Pending');
+  const wins = closed.filter(t => t.outcome === 'Win');
+  const losses = closed.filter(t => t.outcome === 'Loss');
+  const winRate = closed.length > 0 ? ((wins.length / closed.length) * 100).toFixed(0) : '—';
+  const avgPnl = closed.length > 0 ? (closed.reduce((s,t) => s + (t.pnl || 0), 0) / closed.length).toFixed(2) : '—';
+  const avgRR = wins.length > 0 ? (wins.reduce((s,t) => s + (t.rrAchieved || 0), 0) / wins.length).toFixed(1) : '—';
+
+  return (
+    <div className="card">
+      <div className="card-head" onClick={() => setExpanded(!expanded)}>
+        <span>Trade Journal ({trades.length} trades) <Tip k="journal" /></span>
+        <span style={{fontSize:10,color:'var(--muted)'}}>{expanded ? '▼' : '▶'}</span>
+      </div>
+      {expanded && (
+        <div className="card-body">
+          {/* Toolbar */}
+          <div className="journal-toolbar" style={{marginBottom:10}}>
+            <button className="btn btn-accent" onClick={logCurrent} disabled={!setup} title={!setup ? 'No active setup to log' : 'Log current setup'}>
+              + Log This Trade
+            </button>
+            <button className="btn" onClick={() => fileRef.current?.click()}>
+              Import Excel
+            </button>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="journal-import" onChange={importFile} />
+            <button className="btn" onClick={exportFile} disabled={!trades.length}>
+              Export Excel
+            </button>
+            {closed.length > 0 && (
+              <span style={{fontSize:10,color:'var(--muted)',marginLeft:'auto'}}>
+                {wins.length}W / {losses.length}L
+              </span>
+            )}
+          </div>
+
+          {/* Stats */}
+          {closed.length > 0 && (
+            <div className="journal-stats">
+              <div className="journal-stat">
+                <div className="val">{trades.length}</div>
+                <div className="lbl">Total</div>
+              </div>
+              <div className="journal-stat">
+                <div className="val" style={{color: +winRate >= 50 ? 'var(--bull)' : +winRate > 0 ? 'var(--bear)' : 'var(--text)'}}>{winRate}%</div>
+                <div className="lbl">Win Rate <Tip k="winRate" /></div>
+              </div>
+              <div className="journal-stat">
+                <div className="val" style={{color: +avgPnl >= 0 ? 'var(--bull)' : 'var(--bear)'}}>{avgPnl}%</div>
+                <div className="lbl">Avg P&L <Tip k="avgPnl" /></div>
+              </div>
+              <div className="journal-stat">
+                <div className="val" style={{color:'var(--accent)'}}>{avgRR}</div>
+                <div className="lbl">Avg R:R (W) <Tip k="avgRR" /></div>
+              </div>
+            </div>
+          )}
+
+          {/* Trade table */}
+          {trades.length === 0 ? (
+            <div style={{textAlign:'center',padding:20,color:'var(--muted)',fontSize:11}}>
+              No trades logged yet. Click "Log This Trade" to record the current setup, or import an existing Excel file.
+            </div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table style={{minWidth:700}}>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Dir</th>
+                    <th>Entry</th>
+                    <th>SL</th>
+                    <th>TP1</th>
+                    <th>Exit</th>
+                    <th>Outcome</th>
+                    <th>P&L</th>
+                    <th>R:R</th>
+                    <th>Notes</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trades.map((t, idx) => (
+                    <tr key={t.id} style={{opacity: t.outcome === 'Pending' ? 1 : 0.85}}>
+                      <td style={{fontSize:10,whiteSpace:'nowrap'}}>{t.date}</td>
+                      <td><span className={`badge ${t.direction === 'LONG' ? 'badge-bull' : 'badge-bear'}`} style={{fontSize:9}}>{t.direction}</span></td>
+                      <td>{fmtP(t.entry)}</td>
+                      <td className="bear">{fmtP(t.sl)}</td>
+                      <td className="bull">{fmtP(t.tp1)}</td>
+                      <td>
+                        {editingIdx === idx ? (
+                          <input className="input" style={{width:80}} type="number" value={editExit} onChange={e => setEditExit(e.target.value)} placeholder="Exit $" />
+                        ) : (
+                          t.actualExit ? fmtP(t.actualExit) : <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <button className={`outcome-btn outcome-${t.outcome.toLowerCase()}`} onClick={() => cycleOutcome(idx)} title="Click to cycle: Pending → Win → Loss">
+                          {t.outcome}
+                        </button>
+                      </td>
+                      <td style={{color: (t.pnl ?? 0) >= 0 ? 'var(--bull)' : 'var(--bear)', fontWeight:600}}>
+                        {t.pnl != null ? `${t.pnl > 0 ? '+' : ''}${t.pnl}%` : '—'}
+                      </td>
+                      <td style={{color:'var(--accent)'}}>
+                        {t.rrAchieved != null ? `${t.rrAchieved > 0 ? '+' : ''}${t.rrAchieved}` : '—'}
+                      </td>
+                      <td style={{fontSize:10,maxWidth:150,overflow:'hidden',textOverflow:'ellipsis'}}>
+                        {editingIdx === idx ? (
+                          <input className="input" style={{width:120}} value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Notes" />
+                        ) : (
+                          <span title={t.notes}>{t.notes || '—'}</span>
+                        )}
+                      </td>
+                      <td style={{whiteSpace:'nowrap'}}>
+                        {editingIdx === idx ? (
+                          <button className="btn" style={{fontSize:9,padding:'2px 6px'}} onClick={saveEdit}>Save</button>
+                        ) : (
+                          <button className="btn" style={{fontSize:9,padding:'2px 6px'}} onClick={() => startEdit(idx)} title="Edit exit price & notes">Edit</button>
+                        )}
+                        <button className="btn" style={{fontSize:9,padding:'2px 6px',marginLeft:3,color:'var(--bear)'}} onClick={() => deleteTrade(idx)} title="Delete trade">×</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Chart Panel (TradingView Lightweight Charts) ──
+function ChartPanel({candles, ind, smc, setup, tf}) {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !candles || !candles.length) return;
+
+    // Clean up previous chart
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
+
+    const chart = LightweightCharts.createChart(containerRef.current, {
+      layout: {background:{type:'solid',color:'#0d1320'},textColor:'#64748b',fontFamily:'JetBrains Mono',fontSize:10},
+      grid: {vertLines:{color:'rgba(30,41,59,0.5)'},horzLines:{color:'rgba(30,41,59,0.5)'}},
+      crosshair: {mode: LightweightCharts.CrosshairMode.Normal,vertLine:{color:'rgba(59,130,246,0.3)',labelBackgroundColor:'#1e293b'},horzLine:{color:'rgba(59,130,246,0.3)',labelBackgroundColor:'#1e293b'}},
+      rightPriceScale: {borderColor:'#1e293b',scaleMargins:{top:0.1,bottom:0.25}},
+      timeScale: {borderColor:'#1e293b',timeVisible:true,secondsVisible:false},
+      handleScroll:true,handleScale:true,
+    });
+    chartRef.current = chart;
+
+    // Candlestick series
+    const candleSeries = chart.addCandlestickSeries({
+      upColor:'#22c55e',downColor:'#ef4444',borderUpColor:'#22c55e',borderDownColor:'#ef4444',
+      wickUpColor:'#22c55e80',wickDownColor:'#ef444480',
+    });
+    const candleData = candles.map(c => ({time: Math.floor(c.time / 1000), open:c.open, high:c.high, low:c.low, close:c.close}));
+    candleSeries.setData(candleData);
+
+    // Volume series
+    const volSeries = chart.addHistogramSeries({
+      priceFormat:{type:'volume'},
+      priceScaleId:'vol',
+    });
+    chart.priceScale('vol').applyOptions({scaleMargins:{top:0.8,bottom:0}});
+    volSeries.setData(candles.map(c => ({
+      time: Math.floor(c.time / 1000),
+      value: c.volume,
+      color: c.close >= c.open ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+    })));
+
+    // EMA overlays
+    const closes = candles.map(c => c.close);
+    const addEMA = (period, color) => {
+      const emaVals = Ind.ema(closes, period);
+      const lineData = [];
+      for (let i = 0; i < candles.length; i++) {
+        if (emaVals[i] != null) lineData.push({time: Math.floor(candles[i].time / 1000), value: emaVals[i]});
+      }
+      if (lineData.length > 0) {
+        const series = chart.addLineSeries({color, lineWidth:1, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false});
+        series.setData(lineData);
+      }
+    };
+    addEMA(9, 'rgba(59,130,246,0.6)');   // blue
+    addEMA(21, 'rgba(168,85,247,0.5)');   // purple
+    addEMA(50, 'rgba(245,158,11,0.5)');   // amber
+
+    // Bollinger Bands
+    const bbData = Ind.bollinger(closes, 20, 2);
+    const bbUpper = [], bbLower = [];
+    for (let i = 0; i < candles.length; i++) {
+      const t = Math.floor(candles[i].time / 1000);
+      if (bbData.upper[i] != null) bbUpper.push({time:t, value:bbData.upper[i]});
+      if (bbData.lower[i] != null) bbLower.push({time:t, value:bbData.lower[i]});
+    }
+    if (bbUpper.length) {
+      const bU = chart.addLineSeries({color:'rgba(148,163,184,0.5)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+      bU.setData(bbUpper);
+      const bL = chart.addLineSeries({color:'rgba(148,163,184,0.5)',lineWidth:1,lineStyle:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+      bL.setData(bbLower);
+    }
+
+    // Trade setup price lines
+    if (setup) {
+      const addLine = (price, color, title, style) => {
+        candleSeries.createPriceLine({price, color, lineWidth:1, lineStyle: style || 0, axisLabelVisible:true, title});
+      };
+      addLine(setup.entry, '#3b82f6', 'Entry', 2);
+      addLine(setup.sl, '#ef4444', 'SL', 2);
+      setup.tps.forEach(tp => addLine(tp.price, '#22c55e', tp.label, 2));
+    }
+
+    // BOS / CHOCH markers
+    if (smc) {
+      const markers = [];
+      for (const b of (smc.bos || [])) {
+        if (b.idx >= 0 && b.idx < candles.length) {
+          markers.push({
+            time: Math.floor(candles[b.idx].time / 1000),
+            position: b.type === 'bullish' ? 'belowBar' : 'aboveBar',
+            color: b.type === 'bullish' ? '#22c55e' : '#ef4444',
+            shape: 'arrowUp',
+            text: 'BOS',
+          });
+        }
+      }
+      for (const c of (smc.choch || [])) {
+        if (c.idx >= 0 && c.idx < candles.length) {
+          markers.push({
+            time: Math.floor(candles[c.idx].time / 1000),
+            position: c.type === 'bullish' ? 'belowBar' : 'aboveBar',
+            color: '#f59e0b',
+            shape: 'circle',
+            text: 'CHOCH',
+          });
+        }
+      }
+      if (markers.length) {
+        markers.sort((a, b) => a.time - b.time);
+        candleSeries.setMarkers(markers);
+      }
+    }
+
+    chart.timeScale().fitContent();
+
+    // Resize observer
+    const ro = new ResizeObserver(() => {
+      if (containerRef.current) {
+        chart.applyOptions({width: containerRef.current.clientWidth});
+      }
+    });
+    ro.observe(containerRef.current);
+
+    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; };
+  }, [candles, setup, smc, tf]);
+
+  return (
+    <div className="card">
+      <div className="card-head" style={{cursor:'default'}}>
+        <span>Price Chart — {TF_LABELS[tf]} <Tip k="priceChart" /></span>
+        <div style={{display:'flex',gap:10,alignItems:'center',fontSize:11}}>
+          <span style={{display:'flex',alignItems:'center',gap:3}}><span style={{width:14,height:3,borderRadius:2,background:'rgba(59,130,246,0.8)',display:'inline-block'}}></span><span style={{color:'var(--muted)'}}>EMA 9</span></span>
+          <span style={{display:'flex',alignItems:'center',gap:3}}><span style={{width:14,height:3,borderRadius:2,background:'rgba(168,85,247,0.7)',display:'inline-block'}}></span><span style={{color:'var(--muted)'}}>EMA 21</span></span>
+          <span style={{display:'flex',alignItems:'center',gap:3}}><span style={{width:14,height:3,borderRadius:2,background:'rgba(245,158,11,0.7)',display:'inline-block'}}></span><span style={{color:'var(--muted)'}}>EMA 50</span></span>
+          <span style={{display:'flex',alignItems:'center',gap:3}}><span style={{width:14,height:2,borderRadius:1,background:'rgba(148,163,184,0.6)',display:'inline-block',borderTop:'1px dashed rgba(148,163,184,0.7)'}}></span><span style={{color:'var(--muted)'}}>BB</span></span>
+        </div>
+      </div>
+      <div ref={containerRef} style={{height:400,background:'#0d1320'}}></div>
+    </div>
+  );
+}
+
+// ── Simple BTC Price History Chart ──
+const HIST_START = 1483228800000; // Jan 1, 2017 UTC
+const HIST_TFS = {
+  '1d': {label:'Daily', start: HIST_START},
+  '1w': {label:'Weekly', start: HIST_START},
+  '4h': {label:'4H', start: Date.now() - 365*24*60*60*1000}, // 1 year for 4H
+  '1h': {label:'1H', start: Date.now() - 90*24*60*60*1000},  // 90 days for 1H
+  '15m':{label:'15m', start: Date.now() - 14*24*60*60*1000},  // 14 days for 15m
+};
+
+function PriceHistoryChart({allInd}) {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const [chartTF, setChartTF] = useState('1d');
+  const [histCandles, setHistCandles] = useState({});
+  const [histLoading, setHistLoading] = useState(false);
+  const [histCount, setHistCount] = useState(0);
+
+  // Fetch historical data when TF changes
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (histCandles[chartTF]) { setHistCount(histCandles[chartTF].length); return; }
+      setHistLoading(true);
+      try {
+        const startMs = HIST_TFS[chartTF]?.start || HIST_START;
+        const data = await DataService.fetchHistorical(chartTF, startMs);
+        if (!cancelled) {
+          setHistCandles(prev => ({...prev, [chartTF]: data}));
+          setHistCount(data.length);
+        }
+      } catch (e) {
+        console.error('Historical fetch failed:', e);
+        // fall back to allInd data
+        if (!cancelled && allInd[chartTF]?.candles) {
+          setHistCandles(prev => ({...prev, [chartTF]: allInd[chartTF].candles}));
+          setHistCount(allInd[chartTF].candles.length);
+        }
+      }
+      if (!cancelled) setHistLoading(false);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [chartTF]);
+
+  // Render chart
+  useEffect(() => {
+    const candles = histCandles[chartTF];
+    if (!containerRef.current || !candles || !candles.length) return;
+
+    if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; }
+
+    const chart = LightweightCharts.createChart(containerRef.current, {
+      layout: {background:{type:'solid',color:'#0d1320'},textColor:'#64748b',fontFamily:'JetBrains Mono',fontSize:10},
+      grid: {vertLines:{color:'rgba(30,41,59,0.3)'},horzLines:{color:'rgba(30,41,59,0.3)'}},
+      crosshair: {mode: LightweightCharts.CrosshairMode.Normal,vertLine:{color:'rgba(59,130,246,0.3)',labelBackgroundColor:'#1e293b'},horzLine:{color:'rgba(59,130,246,0.3)',labelBackgroundColor:'#1e293b'}},
+      rightPriceScale: {borderColor:'#1e293b',scaleMargins:{top:0.05,bottom:0.05}},
+      timeScale: {borderColor:'#1e293b',timeVisible:true,secondsVisible:false},
+      handleScroll:true,handleScale:true,
+    });
+    chartRef.current = chart;
+
+    // Area series for clean price view
+    const areaSeries = chart.addAreaSeries({
+      topColor: 'rgba(59,130,246,0.3)',
+      bottomColor: 'rgba(59,130,246,0.02)',
+      lineColor: '#3b82f6',
+      lineWidth: 2,
+      priceLineVisible: true,
+      lastValueVisible: true,
+      crosshairMarkerVisible: true,
+    });
+    areaSeries.setData(candles.map(c => ({time: Math.floor(c.time / 1000), value: c.close})));
+
+    // Volume
+    const volSeries = chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});
+    chart.priceScale('vol').applyOptions({scaleMargins:{top:0.85,bottom:0}});
+    volSeries.setData(candles.map(c => ({
+      time: Math.floor(c.time / 1000), value: c.volume,
+      color: c.close >= c.open ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+    })));
+
+    chart.timeScale().fitContent();
+
+    const ro = new ResizeObserver(() => {
+      if (containerRef.current) chart.applyOptions({width: containerRef.current.clientWidth});
+    });
+    ro.observe(containerRef.current);
+    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; };
+  }, [histCandles, chartTF]);
+
+  return (
+    <div className="card">
+      <div className="card-head" style={{cursor:'default'}}>
+        <span>BTC Price History <Tip k="priceHistory" />
+          {histLoading && <span className="pulse" style={{fontSize:10,color:'var(--accent)',marginLeft:6}}>Loading...</span>}
+          {!histLoading && histCount > 0 && <span style={{fontSize:10,color:'var(--muted)',marginLeft:6}}>({histCount.toLocaleString()} candles)</span>}
+        </span>
+        <div style={{display:'flex',gap:4}}>
+          {TIMEFRAMES.map(tf => (
+            <button key={tf} className="btn" onClick={() => setChartTF(tf)}
+              style={{padding:'2px 8px',fontSize:9,background: tf===chartTF ? 'var(--accent-dim)' : undefined, color: tf===chartTF ? '#fff' : undefined, borderColor: tf===chartTF ? 'var(--accent)' : undefined}}>
+              {TF_LABELS[tf]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div ref={containerRef} style={{height:350,background:'#0d1320'}}></div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APP
+// ═══════════════════════════════════════════════════════════════
+function App() {
+  const [allInd, setAllInd] = useState({});
+  const [allSmc, setAllSmc] = useState({});
+  const [tfScores, setTfScores] = useState({});
+  const [composite, setComposite] = useState({score:0,signal:'NEUTRAL',breakdown:{}});
+  const [setup, setSetup] = useState(null);
+  const [livePrice, setLivePrice] = useState(null);
+  const [ticker, setTicker] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [status, setStatus] = useState('Initializing...');
+  const [selectedTF, setSelectedTF] = useState('4h');
+  const [tradeCapital, setTradeCapital] = useState(1000);
+  const [riskAmt, setRiskAmt] = useState(100);
+  const [journalTrades, setJournalTrades] = useState(() => {
+    try { const s = localStorage.getItem('btc_journal'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const updateJournal = useCallback((trades) => {
+    setJournalTrades(trades);
+    try { localStorage.setItem('btc_journal', JSON.stringify(trades)); } catch {}
+  }, []);
+  const wsRef = useRef(null);
+  const prevSetupRef = useRef(null);
+  const prevCompositeRef = useRef(null);
+  const [setupChanges, setSetupChanges] = useState([]);
+  const sessions = useMemo(getActiveSessions, [lastRefresh]);
+
+  const detectChanges = (oldSetup, newSetup, oldComp, newComp) => {
+    const changes = [];
+    const ts = new Date().toLocaleTimeString();
+    if (!oldSetup && newSetup) {
+      changes.push({type:'new', ts, text:`New ${newSetup.direction} signal activated`, detail:`Composite crossed into ${newComp.signal} zone (score: ${newComp.score > 0 ? '+' : ''}${newComp.score})`});
+    } else if (oldSetup && !newSetup) {
+      changes.push({type:'cleared', ts, text:'Setup cleared — score returned to neutral', detail:`Composite score: ${newComp.score > 0 ? '+' : ''}${newComp.score} (neutral zone is -20 to +20)`});
+    } else if (oldSetup && newSetup) {
+      if (oldSetup.direction !== newSetup.direction) {
+        changes.push({type:'flip', ts, text:`Direction flipped: ${oldSetup.direction} → ${newSetup.direction}`, detail:`Composite shifted from ${oldComp.score > 0 ? '+' : ''}${oldComp.score} to ${newComp.score > 0 ? '+' : ''}${newComp.score}`});
+      }
+      if (oldComp && newComp && oldComp.signal !== newComp.signal && oldSetup.direction === newSetup.direction) {
+        changes.push({type:'strength', ts, text:`Signal strength: ${oldComp.signal} → ${newComp.signal}`, detail:`Score moved from ${oldComp.score > 0 ? '+' : ''}${oldComp.score} to ${newComp.score > 0 ? '+' : ''}${newComp.score}`});
+      }
+      const entryShift = Math.abs(newSetup.entry - oldSetup.entry) / oldSetup.entry * 100;
+      if (entryShift > 0.1) {
+        changes.push({type:'levels', ts, text:`Entry shifted ${entryShift > 0.3 ? 'significantly' : 'slightly'}: $${oldSetup.entry.toFixed(0)} → $${newSetup.entry.toFixed(0)}`, detail:`Price moved; SL and TPs recalculated. SL: $${newSetup.sl.toFixed(0)}, TP1: $${newSetup.tps[0].price.toFixed(0)}`});
+      }
+      if (oldSetup.confidence !== newSetup.confidence) {
+        const dir = newSetup.confidence > oldSetup.confidence ? 'up' : 'down';
+        changes.push({type:'confidence', ts, text:`Confidence ${dir}: ${oldSetup.confidence}% → ${newSetup.confidence}%`, detail: dir === 'up' ? 'Indicators aligned more strongly' : 'Some indicators weakened or diverged'});
+      }
+    }
+    return changes;
+  };
+
+  const refresh = useCallback(async () => {
+    try {
+      setError(null);
+      setStatus('Connecting...');
+      const result = await DataService.fetchAll(setStatus);
+      setStatus('Computing indicators...');
+      const ind = {}, smc = {}, scores = {};
+      for (const tf of TIMEFRAMES) {
+        if (!result.candles[tf]) continue;
+        ind[tf] = Ind.computeAll(result.candles[tf]);
+        smc[tf] = SMC.computeAll(result.candles[tf], ind[tf].rsiArr, ind[tf].obvArr);
+        scores[tf] = Confluence.scoreTF(ind[tf], smc[tf]);
+      }
+      const comp = Confluence.composite(scores);
+      let tradeSetup = null;
+      if (comp.signal !== 'NEUTRAL') {
+        tradeSetup = TradeGen.generate(comp.signal, ind, smc, comp, tradeCapital, riskAmt);
+      }
+      // Detect what changed
+      const changes = detectChanges(prevSetupRef.current, tradeSetup, prevCompositeRef.current, comp);
+      if (changes.length > 0) {
+        setSetupChanges(prev => [...changes, ...prev].slice(0, 20));
+      }
+      prevSetupRef.current = tradeSetup;
+      prevCompositeRef.current = comp;
+      setAllInd(ind); setAllSmc(smc); setTfScores(scores); setComposite(comp); setSetup(tradeSetup);
+      setTicker(result.ticker);
+      setLivePrice(+result.ticker.lastPrice);
+      setLastRefresh(new Date());
+      setLoading(false);
+      setStatus('Ready');
+      if (result.errs.length) setError('Partial: ' + result.errs.join(', '));
+    } catch (e) {
+      setError(e.message); setLoading(false); setStatus('Error');
+    }
+  }, [tradeCapital, riskAmt]);
+
+  useEffect(() => { refresh(); const id = setInterval(refresh, REFRESH_MS); return () => clearInterval(id); }, [refresh]);
+
+  // Recalculate setup when capital/risk changes (without refetching)
+  useEffect(() => {
+    if (composite.signal !== 'NEUTRAL' && Object.keys(allInd).length) {
+      setSetup(TradeGen.generate(composite.signal, allInd, allSmc, composite, tradeCapital, riskAmt));
+    }
+  }, [tradeCapital, riskAmt]);
+
+  // WebSocket
+  useEffect(() => {
+    if (loading) return;
+    let ws;
+    const connect = () => {
+      ws = new WebSocket(DataService.getWsUrl());
+      ws.onmessage = e => { try { setLivePrice(+JSON.parse(e.data).k.c); } catch {} };
+      ws.onclose = () => setTimeout(connect, 5000);
+      ws.onerror = () => ws.close();
+      wsRef.current = ws;
+    };
+    connect();
+    return () => { if (wsRef.current) wsRef.current.close(); };
+  }, [loading]);
+
+  const change24h = ticker ? +ticker.priceChangePercent : null;
+
+  if (loading) return (
+    <div>
+      <Header livePrice={null} change24h={null} lastRefresh={null} sessions={getActiveSessions()} onRefresh={refresh} />
+      <div className="loading pulse" style={{marginTop:60}}>{status}</div>
+    </div>
+  );
+
+  return (
+    <div>
+      <Header livePrice={livePrice} change24h={change24h} lastRefresh={lastRefresh} sessions={sessions} onRefresh={refresh} />
+      {error && <div className="error-box">{error}</div>}
+
+      <div className="main-grid">
+        {/* LEFT PANEL */}
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <ChartPanel candles={allInd[selectedTF]?.candles} ind={allInd[selectedTF]} smc={allSmc[selectedTF]} setup={setup} tf={selectedTF} />
+          <ConfluenceMeter tfScores={tfScores} composite={composite} />
+
+          <div className="card">
+            <div className="card-head" style={{cursor:'default'}}>
+              <span>Timeframe Analysis <Tip k="tfAnalysis" /></span>
+              <span className="muted" style={{fontSize:10}}>{allInd[selectedTF]?.candles?.length ?? 0} candles</span>
+            </div>
+            <div className="card-body">
+              <div className="tabs">
+                {TIMEFRAMES.map(tf => (
+                  <div key={tf} className={`tab ${tf===selectedTF?'active':''}`} onClick={() => setSelectedTF(tf)}>
+                    {TF_LABELS[tf]}
+                    <div style={{fontSize:9,marginTop:1,color:tf===selectedTF?'rgba(255,255,255,0.7)':tfScores[tf]?.score>20?'var(--bull)':tfScores[tf]?.score<-20?'var(--bear)':'var(--muted)'}}>
+                      {tfScores[tf] ? (tfScores[tf].score > 0 ? '+' : '') + tfScores[tf].score : '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <TFPanel tf={selectedTF} ind={allInd[selectedTF]} smc={allSmc[selectedTF]} />
+            </div>
+          </div>
+
+          <FactorDetail tfScores={tfScores} selectedTF={selectedTF} />
+        </div>
+
+        {/* RIGHT PANEL */}
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <ExecutiveSummary setup={setup} composite={composite} />
+          <TradeSetupCard setup={setup} tradeCapital={tradeCapital} riskAmt={riskAmt} onCapitalChange={setTradeCapital} onRiskChange={setRiskAmt} composite={composite} setupChanges={setupChanges} />
+          <EntryTiming setup={setup} />
+          <TradeJournal trades={journalTrades} onTradesChange={updateJournal} setup={setup} composite={composite} />
+        </div>
+
+        {/* BOTTOM PANEL */}
+        <div className="bottom-panel" style={{display:'flex',flexDirection:'column',gap:12}}>
+          <PriceHistoryChart allInd={allInd} />
+          <TradingViewChart />
+          <KeyLevelsPanel ind={allInd[selectedTF]} smc={allSmc[selectedTF]} />
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <div className="footer" style={{textAlign:'center'}}>
+        This tool is for educational and informational purposes only. It does not constitute financial advice.
+        Cryptocurrency trading involves substantial risk of loss. Past performance of technical indicators does not guarantee future results.
+        Never trade with money you cannot afford to lose. Always do your own research (DYOR).
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
