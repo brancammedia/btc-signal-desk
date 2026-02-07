@@ -138,7 +138,7 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
 @media(max-width:768px){
   .header{padding:8px 12px;font-size:13px;}
   .main-grid{display:flex!important;flex-direction:column;padding:8px;gap:8px;}
-  .main-grid>.bottom-panel{display:contents;}
+  .bottom-panel{grid-column:auto!important;}
   .card-body{padding:8px 10px;}
   td,th{padding:3px 6px;font-size:11px;}
   td{white-space:normal;word-break:break-word;}
@@ -2709,11 +2709,9 @@ function App() {
         </div>
 
         {/* BOTTOM PANEL */}
-        <div className="bottom-panel" style={{display:'flex',flexDirection:'column',gap:12}}>
-          <div className="m-history"><PriceHistoryChart allInd={allInd} /></div>
-          <div className="m-tvChart"><TradingViewChart /></div>
-          <div className="m-levels"><KeyLevelsPanel ind={allInd[selectedTF]} smc={allSmc[selectedTF]} /></div>
-        </div>
+        <div className="m-history bottom-panel"><PriceHistoryChart allInd={allInd} /></div>
+        <div className="m-tvChart bottom-panel"><TradingViewChart /></div>
+        <div className="m-levels bottom-panel"><KeyLevelsPanel ind={allInd[selectedTF]} smc={allSmc[selectedTF]} /></div>
       </div>
 
       {/* FOOTER */}
