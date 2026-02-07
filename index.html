@@ -16,7 +16,8 @@
   --warn: #f59e0b; --warn-bg: rgba(245,158,11,0.08);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.5;}
+html{overflow-x:hidden;}
+body{background:var(--bg);color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.5;overflow-x:hidden;}
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -25,8 +26,12 @@ h1,h2,h3,h4{font-family:'Outfit',sans-serif;color:var(--text);margin:0;}
 /* Layout */
 .header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100;}
 .main-grid{display:grid;grid-template-columns:1fr;gap:12px;padding:12px;}
-@media(min-width:1100px){.main-grid{grid-template-columns:3fr 2fr;}}
-.bottom-panel{grid-column:1/-1;}
+@media(min-width:1100px){
+  .main-grid{grid-template-columns:3fr 2fr;grid-auto-flow:dense;}
+  .m-chart,.m-confluence,.m-tf,.m-factors{grid-column:1;}
+  .m-summary,.m-setup,.m-entry,.m-journal{grid-column:2;}
+  .bottom-panel{grid-column:1/-1;}
+}
 
 /* Cards */
 .card{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
@@ -132,9 +137,39 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
 /* Responsive */
 @media(max-width:768px){
   .header{padding:8px 12px;font-size:13px;}
-  .main-grid{padding:8px;gap:8px;}
+  .main-grid{display:flex!important;flex-direction:column;padding:8px;gap:8px;}
+  .main-grid>.bottom-panel{display:contents;}
   .card-body{padding:8px 10px;}
-  td,th{padding:3px 6px;font-size:12px;}
+  td,th{padding:3px 6px;font-size:11px;}
+  td{white-space:normal;word-break:break-word;}
+  table{table-layout:auto;}
+  .card{overflow-x:auto;max-width:100vw;}
+  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+  .tab{flex:0 0 auto;padding:6px 10px;font-size:12px;}
+  .journal-stats{gap:6px;}
+  .journal-stat{min-width:70px;padding:6px 8px;}
+  .journal-stat .val{font-size:16px;}
+  .info-bubble-fixed{width:220px;font-size:11px;}
+  .input{width:80px;font-size:12px;}
+
+  /* Module ordering: 1=Chart, 2=Summary, 3=Trade Setup, 4=Entry Timing, rest after */
+  .m-chart{order:1!important;}
+  .m-summary{order:2!important;}
+  .m-setup{order:3!important;}
+  .m-entry{order:4!important;}
+  .m-confluence{order:5!important;}
+  .m-tf{order:6!important;}
+  .m-factors{order:7!important;}
+  .m-history{order:8!important;}
+  .m-tvChart{order:9!important;}
+  .m-journal{order:10!important;}
+  .m-levels{order:11!important;}
+}
+@media(max-width:480px){
+  .header h1{font-size:16px!important;}
+  .badge{font-size:10px;padding:2px 6px;}
+  .card-head{font-size:13px;padding:6px 10px;}
+  .sub-h{font-size:11px;}
 }
 </style>
 </head>
@@ -2628,46 +2663,56 @@ function App() {
 
       <div className="main-grid">
         {/* LEFT PANEL */}
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        <div className="m-chart" style={{display:'flex',flexDirection:'column',gap:12}}>
           <ChartPanel candles={allInd[selectedTF]?.candles} ind={allInd[selectedTF]} smc={allSmc[selectedTF]} setup={setup} tf={selectedTF} />
+        </div>
+        <div className="m-confluence" style={{display:'flex',flexDirection:'column',gap:12}}>
           <ConfluenceMeter tfScores={tfScores} composite={composite} />
+        </div>
 
-          <div className="card">
-            <div className="card-head" style={{cursor:'default'}}>
-              <span>Timeframe Analysis <Tip k="tfAnalysis" /></span>
-              <span className="muted" style={{fontSize:10}}>{allInd[selectedTF]?.candles?.length ?? 0} candles</span>
-            </div>
-            <div className="card-body">
-              <div className="tabs">
-                {TIMEFRAMES.map(tf => (
-                  <div key={tf} className={`tab ${tf===selectedTF?'active':''}`} onClick={() => setSelectedTF(tf)}>
-                    {TF_LABELS[tf]}
-                    <div style={{fontSize:9,marginTop:1,color:tf===selectedTF?'rgba(255,255,255,0.7)':tfScores[tf]?.score>20?'var(--bull)':tfScores[tf]?.score<-20?'var(--bear)':'var(--muted)'}}>
-                      {tfScores[tf] ? (tfScores[tf].score > 0 ? '+' : '') + tfScores[tf].score : '—'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <TFPanel tf={selectedTF} ind={allInd[selectedTF]} smc={allSmc[selectedTF]} />
-            </div>
+        <div className="m-tf card">
+          <div className="card-head" style={{cursor:'default'}}>
+            <span>Timeframe Analysis <Tip k="tfAnalysis" /></span>
+            <span className="muted" style={{fontSize:10}}>{allInd[selectedTF]?.candles?.length ?? 0} candles</span>
           </div>
+          <div className="card-body">
+            <div className="tabs">
+              {TIMEFRAMES.map(tf => (
+                <div key={tf} className={`tab ${tf===selectedTF?'active':''}`} onClick={() => setSelectedTF(tf)}>
+                  {TF_LABELS[tf]}
+                  <div style={{fontSize:9,marginTop:1,color:tf===selectedTF?'rgba(255,255,255,0.7)':tfScores[tf]?.score>20?'var(--bull)':tfScores[tf]?.score<-20?'var(--bear)':'var(--muted)'}}>
+                    {tfScores[tf] ? (tfScores[tf].score > 0 ? '+' : '') + tfScores[tf].score : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <TFPanel tf={selectedTF} ind={allInd[selectedTF]} smc={allSmc[selectedTF]} />
+          </div>
+        </div>
 
+        <div className="m-factors">
           <FactorDetail tfScores={tfScores} selectedTF={selectedTF} />
         </div>
 
         {/* RIGHT PANEL */}
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        <div className="m-summary">
           <ExecutiveSummary setup={setup} composite={composite} />
+        </div>
+        <div className="m-setup">
           <TradeSetupCard setup={setup} tradeCapital={tradeCapital} riskAmt={riskAmt} onCapitalChange={setTradeCapital} onRiskChange={setRiskAmt} composite={composite} setupChanges={setupChanges} />
+        </div>
+        <div className="m-entry">
           <EntryTiming setup={setup} />
+        </div>
+        <div className="m-journal">
           <TradeJournal trades={journalTrades} onTradesChange={updateJournal} setup={setup} composite={composite} />
         </div>
 
         {/* BOTTOM PANEL */}
         <div className="bottom-panel" style={{display:'flex',flexDirection:'column',gap:12}}>
-          <PriceHistoryChart allInd={allInd} />
-          <TradingViewChart />
-          <KeyLevelsPanel ind={allInd[selectedTF]} smc={allSmc[selectedTF]} />
+          <div className="m-history"><PriceHistoryChart allInd={allInd} /></div>
+          <div className="m-tvChart"><TradingViewChart /></div>
+          <div className="m-levels"><KeyLevelsPanel ind={allInd[selectedTF]} smc={allSmc[selectedTF]} /></div>
         </div>
       </div>
 
