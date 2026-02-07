@@ -854,8 +854,9 @@ const TradeGen = {
 
     // ── POSITION SIZING ──
     // riskAmt is the dollar amount user is willing to lose at SL
+    // If riskAmt is 0 (no SL), use trade capital as position (1x, spot)
     const slPct = slDist / entry;
-    const posSizeUSD = slPct > 0 ? riskAmt / slPct : 0;
+    const posSizeUSD = riskAmt > 0 && slPct > 0 ? riskAmt / slPct : tradeCapital;
     const posSizeBTC = posSizeUSD / entry;
 
     // ── LEVERAGE ──
