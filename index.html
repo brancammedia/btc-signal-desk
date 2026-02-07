@@ -1395,6 +1395,7 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskCh
         {(() => {
           const dir = isLong ? 1 : -1;
           const posBTC = setup.posSizeBTC;
+          const cap = setup.tradeCapital || 1000;
           const slPnl = dir * (setup.sl - setup.entry) * posBTC;
           const tpPnls = setup.tps.map((tp, i) => {
             const portion = posBTC * (tp.pct / 100);
@@ -1403,13 +1404,14 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskCh
           const totalIfAllTP = tpPnls.reduce((s,v) => s+v, 0);
           return (
             <table style={{marginBottom:8}}>
-              <thead><tr><th>Level</th><th>Price</th><th style={{textAlign:'right'}}>P&L</th><th></th></tr></thead>
+              <thead><tr><th>Level</th><th>Price</th><th style={{textAlign:'right'}}>P&L</th><th style={{textAlign:'right'}}>% Capital</th><th></th></tr></thead>
               <tbody>
-                <tr><td className="muted">Entry <Tip k="entry" /></td><td style={{color:'var(--text)',fontWeight:600}}>{fmtP(setup.entry)}</td><td></td><td className="muted" style={{fontSize:10}}>Current: {fmtP(setup.price)}</td></tr>
+                <tr><td className="muted">Entry <Tip k="entry" /></td><td style={{color:'var(--text)',fontWeight:600}}>{fmtP(setup.entry)}</td><td></td><td></td><td className="muted" style={{fontSize:10}}>Current: {fmtP(setup.price)}</td></tr>
                 <tr style={{background:'var(--bear-bg)'}}>
                   <td className="bear">Stop Loss <Tip k="stopLoss" /></td>
                   <td className="bear" style={{fontWeight:600}}>{fmtP(setup.sl)}</td>
                   <td className="bear" style={{textAlign:'right',fontWeight:700}}>{slPnl < 0 ? '-' : '+'}${Math.abs(slPnl).toFixed(2)}</td>
+                  <td className="bear" style={{textAlign:'right',fontWeight:600,fontSize:11}}>{fmt(slPnl / cap * 100, 1)}%</td>
                   <td className="muted" style={{fontSize:10}}>-{fmt(setup.slPct)}%</td>
                 </tr>
                 {setup.tps.map((tp, i) => (
@@ -1417,6 +1419,7 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskCh
                     <td className="bull">{tp.label} ({tp.pct}%){i === 0 && <Tip k="tps" />}</td>
                     <td className="bull" style={{fontWeight:600}}>{fmtP(tp.price)}</td>
                     <td className="bull" style={{textAlign:'right',fontWeight:700}}>+${tpPnls[i].toFixed(2)}</td>
+                    <td className="bull" style={{textAlign:'right',fontWeight:600,fontSize:11}}>+{fmt(tpPnls[i] / cap * 100, 1)}%</td>
                     <td className="muted" style={{fontSize:10}}>R:R {fmt(setup.rr[i],1)}</td>
                   </tr>
                 ))}
@@ -1424,12 +1427,17 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskCh
                   <td className="muted" style={{fontWeight:600}}>All TPs Hit</td>
                   <td></td>
                   <td className="bull" style={{textAlign:'right',fontWeight:700,fontSize:12}}>+${totalIfAllTP.toFixed(2)}</td>
+                  <td className="bull" style={{textAlign:'right',fontWeight:700,fontSize:11}}>+{fmt(totalIfAllTP / cap * 100, 1)}%</td>
                   <td></td>
                 </tr>
               </tbody>
             </table>
           );
         })()}
+
+        <div style={{fontSize:10,color:'var(--muted)',lineHeight:1.4,marginBottom:6,padding:'4px 6px',background:'var(--card2)',borderRadius:4}}>
+          P&L is on your leveraged position ({fmtP(setup.posSizeUSD)} at {setup.lev}x). % Capital is return on your ${fmtP(setup.tradeCapital || 1000)} trade capital.
+        </div>
 
         {/* R:R Bar */}
         <div style={{marginBottom:10}}>
