@@ -711,7 +711,7 @@ const Confluence = {
 // TRADE SETUP GENERATOR
 // ═══════════════════════════════════════════════════════════════
 const TradeGen = {
-  generate(direction, allInd, allSmc, composite, tradeCapital, riskAmt) {
+  generate(direction, allInd, allSmc, composite, tradeCapital, riskAmt, userLev = 1) {
     // Use 4H as primary timeframe for setup, with daily/weekly for targets
     const tf4h = allInd['4h'] || allInd['1h'];
     const tfD = allInd['1d'];
@@ -853,35 +853,16 @@ const TradeGen = {
     const avgRR = (rr1 * 0.33 + rr2 * 0.33 + rr3 * 0.34);
 
     // ── POSITION SIZING ──
-    // riskAmt is the dollar amount user is willing to lose at SL
-    // If riskAmt is 0 (no SL), use trade capital as position (1x, spot)
+    // Position = Trade Capital × Leverage
+    // riskAmt = max $ willing to lose at SL (informational cap)
     const slPct = slDist / entry;
-    const posSizeUSD = riskAmt > 0 && slPct > 0 ? riskAmt / slPct : tradeCapital;
-    const posSizeBTC = posSizeUSD / entry;
-
-    // ── LEVERAGE ──
-    // Derive leverage needed from position vs trade capital
     const atrPct = tf4h.atr.pct || 2;
-    let maxLev;
-    if (atrPct < 1.5) maxLev = 10;
-    else if (atrPct < 3) maxLev = 5;
-    else if (atrPct < 5) maxLev = 3;
-    else maxLev = 2;
-    // Leverage needed = position / capital
-    let levNeeded = tradeCapital > 0 ? Math.ceil(posSizeUSD / tradeCapital) : 1;
-    levNeeded = Math.max(1, levNeeded);
-    // Use the needed leverage but cap at ATR-safe max
-    let lev = Math.min(levNeeded, maxLev);
-    // Ensure liquidation is farther than SL
-    while (lev > 1) {
-      const testLiq = isLong ? entry * (1 - 1/lev) : entry * (1 + 1/lev);
-      const liqSafe = isLong ? testLiq < sl : testLiq > sl;
-      if (liqSafe) break;
-      lev--;
-    }
-    const liqPrice = isLong ? entry * (1 - 1/lev) : entry * (1 + 1/lev);
-    const margin = posSizeUSD / lev;
-    const levWarning = levNeeded > maxLev;
+    const lev = Math.max(1, userLev);
+    const posSizeUSD = tradeCapital * lev;
+    const posSizeBTC = posSizeUSD / entry;
+    const slLoss = posSizeUSD * slPct; // actual $ lost if SL hits
+    const liqPrice = lev > 1 ? (isLong ? entry * (1 - 1/lev) : entry * (1 + 1/lev)) : 0;
+    const margin = tradeCapital;
 
     // ── CONFIDENCE ──
     const abScore = Math.abs(composite.score);
@@ -895,7 +876,7 @@ const TradeGen = {
 
     return {
       direction: isLong ? 'LONG' : 'SHORT', entry, sl, tps, slDist, slPct: slPct * 100,
-      rr: [rr1, rr2, rr3], avgRR, posSizeUSD, posSizeBTC, lev, levNeeded, levWarning, maxLev, liqPrice, margin,
+      rr: [rr1, rr2, rr3], avgRR, posSizeUSD, posSizeBTC, lev, liqPrice, margin, slLoss,
       tradeCapital, riskAmt, confidence, atrPct, price, timing, summary,
       ladder, weightedEntry, nearbyObvious, frOffset
     };
@@ -1169,9 +1150,9 @@ const TIPS = {
   stopLoss: 'Maximum risk level. If price hits this, exit the trade to limit losses. Placed beyond key support/resistance using ATR as a buffer.',
   tps: 'Three take-profit targets for scaling out: 33% at TP1 (conservative), 33% at TP2 (moderate), 34% at TP3 (aggressive). This locks in profits progressively.',
   riskReward: 'Ratio of potential loss (to stop) vs potential gain (to TP). Higher R:R = better risk-adjusted trade. Aim for at least 2:1.',
-  positionSizing: 'Trade Capital = how much $ you\'re committing to this trade (your margin deposit). Risk at SL = the max $ you\'ll lose if your stop loss fills exactly. Position Size = Risk / SL Distance %. Example: $100 risk with a 4.5% SL distance → $2,222 position. A wider stop = smaller position. A tighter stop = larger position requiring more leverage.',
-  actualRisk: 'Your real risk depends on stop loss execution. "If SL fills exactly" = best case, you lose only your risk amount. "If SL slips 1%" = realistic scenario in volatile markets where your stop fills worse than expected. "If liquidated" = worst case, you lose your full trade capital (margin). Crypto can gap through stops during flash crashes or low liquidity. Never risk more than you can afford to lose.',
-  leverage: '"Needed" = the leverage your position requires (Position / Trade Capital). "ATR max" = the safe maximum based on current volatility (higher volatility = lower safe leverage). "Applied" = the actual leverage used (capped at ATR max). If needed exceeds ATR max, your effective position is smaller than calculated.',
+  positionSizing: 'Trade Capital = the $ you\'re putting up for this trade. Max Loss at SL = the most you\'re willing to lose. Leverage multiplies your position: $1,000 at 3x = $3,000 position. Use the comparison table to see how each leverage level affects your position, SL loss, TP gains, and liquidation price.',
+  actualRisk: 'At higher leverage, your SL loss is amplified. Check if "Loss if SL hits" exceeds your max loss tolerance. If it does, reduce leverage or widen your capital. Liquidation = total loss of trade capital. At 1x (spot) there is no liquidation.',
+  leverage: 'Select your leverage multiplier. 1x = spot (no leverage). 3x/5x/10x = leveraged position. Higher leverage = bigger gains AND bigger losses. The comparison table shows P&L at each level so you can see the trade-offs. Watch the "SL Loss" column — if it exceeds your max loss tolerance, use lower leverage.',
   liqPrice: 'Liquidation price — where your position is force-closed by the exchange. Keep this far from current price. Higher leverage = closer liquidation.',
   atrVol: 'Current ATR as a percentage of price. Influences stop loss distance and leverage. High volatility (>3%) means use lower leverage.',
   confidence: 'How likely this setup plays out (15-95%). Formula: starts with the absolute composite score (e.g. score of +65 → base 65%), then +10% if average R:R exceeds 2:1 (good reward for risk), and +5% if divergences are detected on the 4H timeframe (momentum confirmation). Clamped between 15% (minimum for any signal) and 95% (never 100% certain). Above 70% = high confidence. 50-70% = moderate. Below 50% = speculative.',
@@ -1322,7 +1303,7 @@ function ConfluenceMeter({tfScores, composite}) {
 }
 
 // ── Trade Setup Card ──
-function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskChange, composite, setupChanges}) {
+function TradeSetupCard({setup, tradeCapital, riskAmt, userLev, onCapitalChange, onRiskChange, onLevChange, composite, setupChanges}) {
   if (!setup) return (
     <div className="card" style={{opacity:0.6}}>
       <div className="card-head" style={{cursor:'default'}}>Trade Setup</div>
@@ -1369,10 +1350,10 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskCh
       `TP2 (33%): $${setup.tps[1].price.toFixed(2)} (R:R ${setup.rr[1].toFixed(1)})`,
       `TP3 (34%): $${setup.tps[2].price.toFixed(2)} (R:R ${setup.rr[2].toFixed(1)})`,
       ``,
-      `Trade Capital: $${tradeCapital} | Risk at SL: $${riskAmt}`,
+      `Trade Capital: $${tradeCapital} | Max Loss at SL: $${riskAmt}`,
       `Position: $${setup.posSizeUSD.toFixed(2)} (${setup.posSizeBTC.toFixed(6)} BTC)`,
-      `Leverage: ${setup.lev}x (needed ${setup.levNeeded}x) | Margin: $${setup.margin.toFixed(2)}`,
-      `Liquidation: $${setup.liqPrice.toFixed(2)}`,
+      `Leverage: ${setup.lev}x | SL Loss: $${(setup.slLoss||0).toFixed(2)}`,
+      `Liquidation: ${setup.liqPrice > 0 ? '$' + setup.liqPrice.toFixed(2) : 'N/A (spot)'}`,
       `Confidence: ${setup.confidence}% | Composite: ${composite.score}`,
       ``,
       `⚠️ Algorithmic analysis, not a recommendation. DYOR.`
@@ -1437,7 +1418,7 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskCh
         })()}
 
         <div style={{fontSize:10,color:'var(--muted)',lineHeight:1.4,marginBottom:6,padding:'4px 6px',background:'var(--card2)',borderRadius:4}}>
-          P&L is on your leveraged position ({fmtP(setup.posSizeUSD)} at {setup.lev}x). % Capital is return on your ${fmtP(setup.tradeCapital || 1000)} trade capital.
+          P&L is on your {setup.lev}x position ({fmtP(setup.posSizeUSD)}). % Capital is return on your {fmtP(tradeCapital)} trade capital.
         </div>
 
         {/* R:R Bar */}
@@ -1451,9 +1432,9 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskCh
 
         {/* Position Sizing */}
         {(() => {
-          const marginExceedsCapital = setup.margin > tradeCapital;
-          const riskExceedsCapital = riskAmt > tradeCapital;
-          const riskPctOfCapital = tradeCapital > 0 ? (riskAmt / tradeCapital * 100).toFixed(1) : 0;
+          const LEV_OPTIONS = [1, 3, 5, 10];
+          const slLoss = setup.slLoss || 0;
+          const slExceedsRisk = riskAmt > 0 && slLoss > riskAmt;
           return (<>
             <div className="sub-h">Position Sizing <Tip k="positionSizing" /></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
@@ -1463,82 +1444,98 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, onCapitalChange, onRiskCh
                 <div style={{fontSize:9,color:'var(--muted)',marginTop:2}}>$ you're putting up</div>
               </div>
               <div>
-                <div style={{fontSize:11,color:'var(--muted)',marginBottom:2}}>Risk at Stop Loss</div>
-                <input className="input" type="number" value={riskAmt} onChange={e => onRiskChange(+e.target.value)} min="10" step="10" style={{width:'100%'}} />
-                <div style={{fontSize:9,color: riskExceedsCapital ? 'var(--bear)' : 'var(--muted)',marginTop:2}}>{riskPctOfCapital}% of capital{riskExceedsCapital ? ' — exceeds capital!' : ''}</div>
+                <div style={{fontSize:11,color:'var(--muted)',marginBottom:2}}>Max Loss at SL</div>
+                <input className="input" type="number" value={riskAmt} onChange={e => onRiskChange(+e.target.value)} min="0" step="10" style={{width:'100%'}} />
+                <div style={{fontSize:9,color:'var(--muted)',marginTop:2}}>$ most willing to lose</div>
               </div>
             </div>
 
-            {/* Show the formula transparently */}
+            {/* Leverage Selector */}
+            <div className="sub-h" style={{marginTop:4}}>Leverage <Tip k="leverage" /></div>
+            <div style={{display:'flex',gap:4,marginBottom:8}}>
+              {LEV_OPTIONS.map(l => (
+                <button key={l} className={`btn ${l === userLev ? 'btn-accent' : ''}`}
+                  style={{flex:1,padding:'6px 0',fontSize:13,fontWeight:700}}
+                  onClick={() => onLevChange(l)}>
+                  {l}x
+                </button>
+              ))}
+            </div>
+
+            {/* Position summary */}
             <div style={{background:'var(--card2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 12px',marginBottom:8,fontSize:12}}>
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
-                <span style={{color:'var(--muted)'}}>Max Loss at SL</span>
-                <span style={{color:'var(--bear)',fontWeight:600}}>{fmtP(riskAmt)}</span>
+                <span style={{color:'var(--muted)'}}>Position Size</span>
+                <span style={{color:'var(--text)',fontWeight:700,fontSize:14}}>{fmtP(setup.posSizeUSD)}</span>
               </div>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
-                <span style={{color:'var(--muted)'}}>SL Distance</span>
-                <span style={{color:'var(--bear)',fontWeight:500}}>{fmtP(setup.slDist)} ({fmt(setup.slPct,2)}%)</span>
+              <div style={{color:'var(--muted)',fontSize:10,textAlign:'right',marginTop:2}}>
+                {fmtP(tradeCapital)} x {setup.lev}x = {fmtP(setup.posSizeUSD)} ({fmt(setup.posSizeBTC,6)} BTC)
               </div>
-              <div style={{borderTop:'1px solid var(--border)',paddingTop:6,marginTop:2}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{color:'var(--dim)'}}>Position Size</span>
-                  <span style={{color:'var(--text)',fontWeight:700,fontSize:14}}>{fmtP(setup.posSizeUSD)}</span>
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:6,marginTop:6}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{color:'var(--muted)'}}>SL Distance</span>
+                  <span style={{color:'var(--bear)',fontWeight:500}}>{fmtP(setup.slDist)} ({fmt(setup.slPct,2)}%)</span>
                 </div>
-                <div style={{color:'var(--muted)',fontSize:10,textAlign:'right',marginTop:2}}>{fmtP(riskAmt)} / {fmt(setup.slPct,2)}% = {fmtP(setup.posSizeUSD)} ({fmt(setup.posSizeBTC,6)} BTC)</div>
+                <div style={{display:'flex',justifyContent:'space-between'}}>
+                  <span style={{color:'var(--muted)'}}>Loss if SL hits</span>
+                  <span style={{color: slExceedsRisk ? 'var(--bear)' : 'var(--warn)', fontWeight:700}}>-{fmtP(slLoss)}</span>
+                </div>
               </div>
+              {setup.lev > 1 && setup.liqPrice > 0 && (
+                <div style={{borderTop:'1px solid var(--border)',paddingTop:6,marginTop:6}}>
+                  <div style={{display:'flex',justifyContent:'space-between'}}>
+                    <span style={{color: setup.lev > 3 ? 'var(--warn)' : 'var(--muted)'}}>Liquidation Price</span>
+                    <span style={{color: setup.lev > 3 ? 'var(--warn)' : 'var(--dim)', fontWeight:600}}>{fmtP(setup.liqPrice)}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Actual Risk */}
-            <div style={{background:'var(--warn-bg)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:6,padding:'8px 10px',marginBottom:8,fontSize:11,lineHeight:1.5}}>
-              <div style={{color:'var(--warn)',fontWeight:600,marginBottom:4,fontSize:12}}>Actual Risk <Tip k="actualRisk" /></div>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
-                <span style={{color:'var(--dim)'}}>If SL fills exactly</span>
-                <span style={{color:'var(--bear)',fontWeight:600}}>-{fmtP(riskAmt)}</span>
+            {/* SL vs Risk warning */}
+            {slExceedsRisk && (
+              <div style={{background:'var(--bear-bg)',border:'1px solid var(--bear-dim)',borderRadius:6,padding:'8px 10px',marginBottom:8,fontSize:11,lineHeight:1.5}}>
+                <div style={{color:'var(--bear)',fontWeight:600,marginBottom:3}}>SL loss exceeds your max risk</div>
+                <div style={{color:'var(--dim)'}}>
+                  At {setup.lev}x leverage, the {fmt(setup.slPct,2)}% SL distance means you'd lose <strong style={{color:'var(--bear)'}}>{fmtP(slLoss)}</strong> — more than your {fmtP(riskAmt)} max loss target.
+                  {setup.lev > 1 ? ' Reduce leverage or tighten your stop.' : ' Consider a tighter stop or increase your max loss.'}
+                </div>
               </div>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
-                <span style={{color:'var(--dim)'}}>If SL slips 1%</span>
-                <span style={{color:'var(--bear)',fontWeight:600}}>-{fmtP(riskAmt + setup.posSizeUSD * 0.01)}</span>
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between'}}>
-                <span style={{color:'var(--dim)'}}>If liquidated (max loss)</span>
-                <span style={{color:'var(--bear)',fontWeight:700}}>-{fmtP(Math.min(setup.margin, tradeCapital))}</span>
-              </div>
+            )}
+
+            {/* Leverage Comparison Table */}
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:10,color:'var(--muted)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.5px'}}>Leverage Comparison</div>
+              <table style={{fontSize:11}}>
+                <thead>
+                  <tr>
+                    <th>Lev</th>
+                    <th style={{textAlign:'right'}}>Position</th>
+                    <th style={{textAlign:'right'}}>SL Loss</th>
+                    <th style={{textAlign:'right'}}>TP1 Gain</th>
+                    <th style={{textAlign:'right'}}>Liq Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {LEV_OPTIONS.map(l => {
+                    const pos = tradeCapital * l;
+                    const btc = pos / setup.entry;
+                    const loss = pos * (setup.slPct / 100);
+                    const tp1Gain = Math.abs(setup.tps[0].price - setup.entry) * btc * (setup.tps[0].pct / 100);
+                    const liq = l > 1 ? (isLong ? setup.entry * (1 - 1/l) : setup.entry * (1 + 1/l)) : null;
+                    const active = l === userLev;
+                    return (
+                      <tr key={l} style={{background: active ? 'var(--accent-bg)' : 'transparent', cursor:'pointer'}} onClick={() => onLevChange(l)}>
+                        <td style={{fontWeight: active ? 700 : 400, color: active ? 'var(--accent)' : 'var(--dim)'}}>{l}x{active ? ' *' : ''}</td>
+                        <td style={{textAlign:'right',color:'var(--text)'}}>{fmtP(pos)}</td>
+                        <td style={{textAlign:'right',color:'var(--bear)'}}>-{fmtP(loss)}</td>
+                        <td style={{textAlign:'right',color:'var(--bull)'}}>+{fmtP(tp1Gain)}</td>
+                        <td style={{textAlign:'right',color: l > 3 ? 'var(--warn)' : 'var(--dim)'}}>{liq ? fmtP(liq) : '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-
-            {/* Leverage */}
-            <div className="sub-h" style={{marginTop:8}}>Leverage <Tip k="leverage" /></div>
-            <table style={{fontSize:12}}>
-              <tbody>
-                <tr>
-                  <td className="muted">Needed</td>
-                  <td style={{color: setup.levWarning ? 'var(--bear)' : 'var(--text)', fontWeight:600}}>
-                    {setup.levNeeded}x
-                    {setup.levWarning && <span className="bear" style={{fontWeight:400,fontSize:10}}> exceeds safe max ({setup.maxLev}x)</span>}
-                  </td>
-                </tr>
-                <tr><td className="muted">Applied</td><td style={{color:'var(--text)',fontWeight:600}}>{setup.lev}x <span className="muted" style={{fontWeight:400}}>(ATR max {setup.maxLev}x)</span></td></tr>
-                <tr><td className="muted">Margin Required</td><td style={{color: marginExceedsCapital ? 'var(--bear)' : 'var(--text)', fontWeight: marginExceedsCapital ? 700 : 400}}>{fmtP(setup.margin)}</td></tr>
-                <tr>
-                  <td className={setup.lev > 3 ? 'warn' : 'muted'}>Liquidation Price <Tip k="liqPrice" /></td>
-                  <td className={setup.lev > 3 ? 'warn' : ''}>{fmtP(setup.liqPrice)}</td>
-                </tr>
-                <tr><td className="muted">ATR Volatility <Tip k="atrVol" /></td><td>{fmt(setup.atrPct)}%</td></tr>
-              </tbody>
-            </table>
-
-            {/* Warnings */}
-            {marginExceedsCapital && (
-              <div style={{color:'var(--bear)',fontSize:11,marginTop:6,display:'flex',gap:4,alignItems:'flex-start',fontWeight:600}}>
-                <span style={{flexShrink:0}}>&#9888;</span>
-                <span>Margin ({fmtP(setup.margin)}) exceeds your trade capital ({fmtP(tradeCapital)}). Increase capital or reduce risk amount.</span>
-              </div>
-            )}
-            {setup.levWarning && !marginExceedsCapital && (
-              <div style={{color:'var(--warn)',fontSize:11,marginTop:6,display:'flex',gap:4,alignItems:'flex-start'}}>
-                <span style={{flexShrink:0}}>&#9888;</span>
-                <span>Needed leverage ({setup.levNeeded}x) exceeds ATR-safe maximum ({setup.maxLev}x). Applied {setup.lev}x instead — actual risk may differ.</span>
-              </div>
-            )}
           </>);
         })()}
 
@@ -2555,6 +2552,7 @@ function App() {
   const [selectedTF, setSelectedTF] = useState('4h');
   const [tradeCapital, setTradeCapital] = useState(1000);
   const [riskAmt, setRiskAmt] = useState(100);
+  const [userLev, setUserLev] = useState(1);
   const [journalTrades, setJournalTrades] = useState(() => {
     try { const s = localStorage.getItem('btc_journal'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
@@ -2610,7 +2608,7 @@ function App() {
       const comp = Confluence.composite(scores);
       let tradeSetup = null;
       if (comp.signal !== 'NEUTRAL') {
-        tradeSetup = TradeGen.generate(comp.signal, ind, smc, comp, tradeCapital, riskAmt);
+        tradeSetup = TradeGen.generate(comp.signal, ind, smc, comp, tradeCapital, riskAmt, userLev);
       }
       // Detect what changed
       const changes = detectChanges(prevSetupRef.current, tradeSetup, prevCompositeRef.current, comp);
@@ -2629,16 +2627,16 @@ function App() {
     } catch (e) {
       setError(e.message); setLoading(false); setStatus('Error');
     }
-  }, [tradeCapital, riskAmt]);
+  }, [tradeCapital, riskAmt, userLev]);
 
   useEffect(() => { refresh(); const id = setInterval(refresh, REFRESH_MS); return () => clearInterval(id); }, [refresh]);
 
   // Recalculate setup when capital/risk changes (without refetching)
   useEffect(() => {
     if (composite.signal !== 'NEUTRAL' && Object.keys(allInd).length) {
-      setSetup(TradeGen.generate(composite.signal, allInd, allSmc, composite, tradeCapital, riskAmt));
+      setSetup(TradeGen.generate(composite.signal, allInd, allSmc, composite, tradeCapital, riskAmt, userLev));
     }
-  }, [tradeCapital, riskAmt]);
+  }, [tradeCapital, riskAmt, userLev]);
 
   // WebSocket
   useEffect(() => {
@@ -2699,7 +2697,7 @@ function App() {
         {/* RIGHT PANEL (desktop wrapper, unwraps on mobile) */}
         <div className="col-right">
           <div className="m-summary"><ExecutiveSummary setup={setup} composite={composite} /></div>
-          <div className="m-setup"><TradeSetupCard setup={setup} tradeCapital={tradeCapital} riskAmt={riskAmt} onCapitalChange={setTradeCapital} onRiskChange={setRiskAmt} composite={composite} setupChanges={setupChanges} /></div>
+          <div className="m-setup"><TradeSetupCard setup={setup} tradeCapital={tradeCapital} riskAmt={riskAmt} userLev={userLev} onCapitalChange={setTradeCapital} onRiskChange={setRiskAmt} onLevChange={setUserLev} composite={composite} setupChanges={setupChanges} /></div>
           <div className="m-entry"><EntryTiming setup={setup} /></div>
           <div className="m-journal"><TradeJournal trades={journalTrades} onTradesChange={updateJournal} setup={setup} composite={composite} /></div>
         </div>
