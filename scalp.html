@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC Scalp Lab — Signal Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e17; --card: #111827; --card2: #0d1320; --border: #1e293b; --border2: #334155;
+  --text: #e2e8f0; --dim: #94a3b8; --muted: #64748b; --dark: #475569;
+  --bull: #22c55e; --bull-dim: #166534; --bull-bg: rgba(34,197,94,0.08);
+  --bear: #ef4444; --bear-dim: #991b1b; --bear-bg: rgba(239,68,68,0.08);
+  --accent: #3b82f6; --accent-dim: #1d4ed8; --accent-bg: rgba(59,130,246,0.08);
+  --warn: #f59e0b; --warn-bg: rgba(245,158,11,0.08);
+  --purple: #a855f7; --purple-dim: #7e22ce; --purple-bg: rgba(168,85,247,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{overflow-x:hidden;}
+body{background:var(--bg);color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.5;overflow-x:hidden;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+h1,h2,h3,h4{font-family:'Outfit',sans-serif;color:var(--text);margin:0;}
+
+/* Layout */
+.header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100;}
+.main-grid{display:grid;grid-template-columns:1fr;gap:12px;padding:12px;}
+.col-left,.col-right{display:flex;flex-direction:column;gap:12px;}
+@media(min-width:1100px){
+  .main-grid{grid-template-columns:3fr 2fr;}
+  .bottom-panel{grid-column:1/-1;}
+}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.card-head{background:var(--card2);padding:8px 14px;font-family:'Outfit',sans-serif;font-weight:600;font-size:15px;color:var(--text);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;}
+.card-head:hover{background:var(--border);}
+.card-body{padding:10px 14px;}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;padding:4px 8px;border-bottom:1px solid var(--border);}
+td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;white-space:nowrap;}
+
+/* Colors */
+.bull{color:var(--bull);}.bear{color:var(--bear);}.warn{color:var(--warn);}.accent{color:var(--accent);}.muted{color:var(--muted);}.text{color:var(--text);}
+.bull-bg{background:var(--bull-bg);}.bear-bg{background:var(--bear-bg);}.warn-bg{background:var(--warn-bg);}
+
+/* Badges */
+.badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;}
+.badge-bull{background:var(--bull-bg);color:var(--bull);border:1px solid var(--bull-dim);}
+.badge-bear{background:var(--bear-bg);color:var(--bear);border:1px solid var(--bear-dim);}
+.badge-neutral{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-dim);}
+.badge-warn{background:var(--warn-bg);color:var(--warn);border:1px solid rgba(245,158,11,0.3);}
+.badge-purple{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-dim);}
+
+/* Sub-headings */
+.sub-h{color:var(--accent);font-size:12px;font-weight:600;padding:8px 0 3px;text-transform:uppercase;letter-spacing:0.7px;}
+
+/* Buttons */
+.btn{background:var(--border);border:1px solid var(--border2);color:var(--dim);padding:6px 14px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;transition:all 0.15s;}
+.btn:hover{background:var(--border2);color:var(--text);}
+.btn-accent{background:var(--accent-dim);border-color:var(--accent);color:#fff;}
+.btn-accent:hover{background:var(--accent);}
+.btn-bull{background:var(--bull-dim);border-color:var(--bull);color:#fff;}
+.btn-bear{background:var(--bear-dim);border-color:var(--bear);color:#fff;}
+
+/* Inputs */
+.input{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:4px;font-family:inherit;font-size:13px;width:110px;text-align:right;}
+.input:focus{outline:none;border-color:var(--accent);}
+
+/* Meter */
+.meter-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;position:relative;}
+.meter-fill{height:100%;border-radius:3px;transition:width 0.5s ease;}
+
+/* Glow */
+.glow-bull{box-shadow:0 0 25px rgba(34,197,94,0.15),0 0 50px rgba(34,197,94,0.05);border-color:var(--bull-dim)!important;}
+.glow-bear{box-shadow:0 0 25px rgba(239,68,68,0.15),0 0 50px rgba(239,68,68,0.05);border-color:var(--bear-dim)!important;}
+
+/* Session */
+.session-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.session-pill{display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:10px;white-space:nowrap;}
+.session-pill .s-name{font-weight:600;min-width:28px;}
+.session-pill .s-timer{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:-0.3px;}
+
+/* Tabs */
+.tabs{display:flex;gap:2px;padding:4px;background:var(--card2);border-radius:6px;margin-bottom:8px;}
+.tab{padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:all 0.15s;text-align:center;flex:1;}
+.tab:hover{color:var(--dim);background:rgba(59,130,246,0.05);}
+.tab.active{background:var(--accent-dim);color:#fff;}
+
+/* Info tip */
+.info-tip{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--border);color:var(--muted);font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;cursor:help;margin-left:5px;flex-shrink:0;transition:all 0.15s;line-height:1;vertical-align:middle;user-select:none;}
+.info-tip:hover{background:var(--accent-dim);color:#fff;}
+.info-bubble-fixed{position:fixed;background:var(--card2);border:1px solid var(--border2);color:var(--dim);padding:10px 12px;border-radius:8px;font-size:12px;font-weight:400;white-space:normal;width:280px;z-index:9999;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,0.6);pointer-events:none;font-family:'JetBrains Mono',monospace;}
+.info-bubble-fixed::after{content:'';position:absolute;left:var(--arrow,50%);transform:translateX(-50%);border:6px solid transparent;}
+.info-bubble-fixed.above::after{top:100%;border-top-color:var(--border2);}
+.info-bubble-fixed.below::after{bottom:100%;border-bottom-color:var(--border2);}
+
+/* RR bar */
+.rr-bar{display:flex;height:22px;border-radius:4px;overflow:hidden;font-size:11px;font-weight:600;line-height:22px;text-align:center;}
+.rr-sl{background:var(--bear-dim);color:var(--bear);}
+.rr-tp{background:var(--bull-dim);color:var(--bull);}
+
+/* Scanner grid */
+.scanner-grid{display:grid;grid-template-columns:1fr repeat(4,48px);gap:1px;font-size:12px;}
+.scanner-cell{padding:6px 4px;text-align:center;border-bottom:1px solid rgba(30,41,59,0.3);}
+.scanner-label{text-align:left;padding:6px 8px;color:var(--dim);border-bottom:1px solid rgba(30,41,59,0.3);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.scanner-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+
+/* Strategy card expand */
+.strat-card{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;transition:all .2s;}
+.strat-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;background:var(--card2);transition:background .15s;}
+.strat-head:hover{background:var(--border);}
+.strat-body{padding:12px 14px;display:none;border-top:1px solid var(--border);}
+.strat-body.open{display:block;}
+.strat-tag{font-size:10px;padding:2px 8px;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.diff-1{background:var(--bull-bg);color:var(--bull);}
+.diff-2{background:var(--warn-bg);color:var(--warn);}
+.diff-3{background:var(--bear-bg);color:var(--bear);}
+
+/* Checklist */
+.check-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;}
+.check-icon{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.check-pass{background:var(--bull-bg);color:var(--bull);border:1px solid var(--bull-dim);}
+.check-fail{background:var(--bear-bg);color:var(--bear);border:1px solid var(--bear-dim);}
+.check-na{background:var(--accent-bg);color:var(--muted);border:1px solid var(--border);}
+
+/* Animations */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.pulse{animation:pulse 1.5s infinite;}
+.fade-in{animation:fadeIn .3s ease-out;}
+
+/* Loading */
+.loading{text-align:center;padding:40px;color:var(--muted);}
+.error-box{color:var(--bear);background:var(--bear-bg);border:1px solid var(--bear-dim);padding:10px 16px;margin:12px;border-radius:8px;font-size:13px;}
+
+/* Footer */
+.footer{background:var(--card);border-top:1px solid var(--border);padding:12px 20px;font-size:12px;color:var(--muted);line-height:1.6;}
+
+/* Responsive */
+@media(max-width:768px){
+  .header{padding:8px 10px;font-size:13px;gap:6px;}
+  .session-pill{padding:2px 6px;font-size:9px;}
+  .session-pill .s-name{min-width:auto;font-size:9px;}
+  .session-pill .s-timer{font-size:8px;}
+  .main-grid{display:flex!important;flex-direction:column;padding:8px;gap:8px;}
+  .col-left,.col-right{display:contents!important;}
+  .card-body{padding:8px 10px;}
+  td,th{padding:3px 6px;font-size:11px;}
+  td{white-space:normal;word-break:break-word;}
+  table{table-layout:auto;}
+  .card{overflow-x:auto;max-width:100vw;}
+  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+  .tab{flex:0 0 auto;padding:6px 10px;font-size:12px;}
+  .info-bubble-fixed{width:220px;font-size:11px;}
+  .input{width:80px;font-size:12px;}
+  .scanner-grid{grid-template-columns:1fr repeat(4,40px);font-size:11px;}
+  .m-chart{order:1!important;}
+  .m-setups{order:2!important;}
+  .m-scanner{order:3!important;}
+  .m-sizer{order:4!important;}
+  .m-playbook{order:5!important;}
+  .m-risk{order:6!important;}
+  .m-ref{order:7!important;}
+}
+@media(max-width:480px){
+  .header h1{font-size:16px!important;}
+  .badge{font-size:10px;padding:2px 6px;}
+  .card-head{font-size:13px;padding:6px 10px;}
+  .sub-h{font-size:11px;}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo} = React;
+
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const API_ENDPOINTS = [
+  'https://api.binance.us/api/v3',
+  'https://api1.binance.com/api/v3',
+  'https://api.binance.com/api/v3',
+];
+const WS_ENDPOINTS = [
+  'wss://stream.binance.us:9443/ws/btcusdt@kline_1m',
+  'wss://stream.binance.com:9443/ws/btcusdt@kline_1m',
+];
+const TIMEFRAMES = ['1m','5m','15m','1h'];
+const TF_LABELS = {'1m':'1m','5m':'5m','15m':'15m','1h':'1H'};
+const TF_WEIGHTS = {'1h':3,'15m':2,'5m':1.5,'1m':1};
+const CANDLE_LIMIT = 300;
+const REFRESH_MS = 30000;
+const FETCH_TIMEOUT = 10000;
+
+// ═══════════════════════════════════════════════════════════════
+// DATA SERVICE
+// ═══════════════════════════════════════════════════════════════
+const DataService = {
+  _baseUrl: null,
+  _fetchWithTimeout(url, ms = FETCH_TIMEOUT) {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), ms);
+    return fetch(url, {signal:c.signal}).finally(() => clearTimeout(t));
+  },
+  async _findEndpoint(cb) {
+    for (const base of API_ENDPOINTS) {
+      try {
+        cb && cb(`Trying ${base}...`);
+        const r = await this._fetchWithTimeout(`${base}/ping`);
+        if (r.ok) { this._baseUrl = base; cb && cb(`Connected: ${base}`); return; }
+      } catch {}
+    }
+    throw new Error('All Binance API endpoints unreachable.');
+  },
+  async _fetch(url, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const r = await this._fetchWithTimeout(url);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r.json();
+      } catch (e) { if (i === retries - 1) throw e; await new Promise(r => setTimeout(r, 1000 * 2 ** i)); }
+    }
+  },
+  _parse(raw) {
+    return raw.map(k => ({time:k[0],open:+k[1],high:+k[2],low:+k[3],close:+k[4],volume:+k[5]}));
+  },
+  async fetchAll(cb) {
+    if (!this._baseUrl) await this._findEndpoint(cb);
+    cb && cb('Fetching candles...');
+    const candles = {};
+    const errs = [];
+    const res = await Promise.allSettled(TIMEFRAMES.map(async tf => {
+      const raw = await this._fetch(`${this._baseUrl}/klines?symbol=BTCUSDT&interval=${tf}&limit=${CANDLE_LIMIT}`);
+      candles[tf] = this._parse(raw);
+    }));
+    res.forEach((r, i) => { if (r.status === 'rejected') errs.push(TIMEFRAMES[i]); });
+    if (errs.length === TIMEFRAMES.length) throw new Error('All fetches failed');
+    cb && cb('Fetching ticker...');
+    const ticker = await this._fetch(`${this._baseUrl}/ticker/24hr?symbol=BTCUSDT`);
+    return {candles, ticker, errs};
+  },
+  getWsUrl() { return this._baseUrl?.includes('binance.us') ? WS_ENDPOINTS[0] : WS_ENDPOINTS[1]; }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// INDICATOR ENGINE
+// ═══════════════════════════════════════════════════════════════
+const Ind = {
+  sma(d, p) {
+    const o = Array(d.length).fill(null);
+    for (let i = p - 1; i < d.length; i++) { let s = 0; for (let j = i - p + 1; j <= i; j++) s += d[j]; o[i] = s / p; }
+    return o;
+  },
+  ema(d, p) {
+    const k = 2 / (p + 1), o = Array(d.length).fill(null);
+    let s = 0; for (let i = 0; i < p; i++) s += d[i]; o[p - 1] = s / p;
+    for (let i = p; i < d.length; i++) o[i] = d[i] * k + o[i - 1] * (1 - k);
+    return o;
+  },
+  rsi(c, p = 14) {
+    const o = Array(c.length).fill(null);
+    if (c.length < p + 1) return o;
+    let gS = 0, lS = 0;
+    for (let i = 1; i <= p; i++) { const d = c[i] - c[i - 1]; d > 0 ? gS += d : lS -= d; }
+    let aG = gS / p, aL = lS / p;
+    o[p] = aL === 0 ? 100 : 100 - 100 / (1 + aG / aL);
+    for (let i = p + 1; i < c.length; i++) {
+      const d = c[i] - c[i - 1];
+      aG = (aG * (p - 1) + (d > 0 ? d : 0)) / p;
+      aL = (aL * (p - 1) + (d < 0 ? -d : 0)) / p;
+      o[i] = aL === 0 ? 100 : 100 - 100 / (1 + aG / aL);
+    }
+    return o;
+  },
+  macd(c, f = 12, s = 26, g = 9) {
+    const eF = this.ema(c, f), eS = this.ema(c, s);
+    const line = c.map((_, i) => eF[i] != null && eS[i] != null ? eF[i] - eS[i] : null);
+    const fv = line.findIndex(v => v != null);
+    if (fv < 0) return {line, signal: line.map(() => null), hist: line.map(() => null)};
+    const mv = line.slice(fv).map(v => v ?? 0);
+    const sr = this.ema(mv, g);
+    const signal = Array(fv).fill(null).concat(sr);
+    const hist = c.map((_, i) => line[i] != null && signal[i] != null ? line[i] - signal[i] : null);
+    return {line, signal, hist};
+  },
+  bollinger(c, p = 20, m = 2) {
+    const mid = this.sma(c, p), u = Array(c.length).fill(null), l = Array(c.length).fill(null), bw = Array(c.length).fill(null);
+    for (let i = p - 1; i < c.length; i++) {
+      let sq = 0; for (let j = i - p + 1; j <= i; j++) sq += (c[j] - mid[i]) ** 2;
+      const sd = Math.sqrt(sq / p);
+      u[i] = mid[i] + m * sd; l[i] = mid[i] - m * sd;
+      bw[i] = mid[i] ? ((u[i] - l[i]) / mid[i]) * 100 : null;
+    }
+    return {upper: u, middle: mid, lower: l, bw};
+  },
+  atr(candles, p = 14) {
+    const tr = candles.map((c, i) => i === 0 ? c.high - c.low : Math.max(c.high - c.low, Math.abs(c.high - candles[i-1].close), Math.abs(c.low - candles[i-1].close)));
+    const o = Array(candles.length).fill(null);
+    let s = 0; for (let i = 0; i < Math.min(p, tr.length); i++) s += tr[i];
+    if (tr.length >= p) o[p - 1] = s / p;
+    for (let i = p; i < tr.length; i++) o[i] = (o[i - 1] * (p - 1) + tr[i]) / p;
+    return o;
+  },
+  adx(candles, p = 14) {
+    const len = candles.length, pDI = Array(len).fill(null), mDI = Array(len).fill(null), adxO = Array(len).fill(null);
+    if (len < p * 2 + 1) return {adx: adxO, pDI, mDI};
+    const tr = [], pd = [], md = [];
+    for (let i = 1; i < len; i++) {
+      const h = candles[i].high, l = candles[i].low, pH = candles[i-1].high, pL = candles[i-1].low, pC = candles[i-1].close;
+      tr.push(Math.max(h - l, Math.abs(h - pC), Math.abs(l - pC)));
+      const u = h - pH, d = pL - l;
+      pd.push(u > d && u > 0 ? u : 0); md.push(d > u && d > 0 ? d : 0);
+    }
+    let sT = 0, sP = 0, sM = 0;
+    for (let i = 0; i < p; i++) { sT += tr[i]; sP += pd[i]; sM += md[i]; }
+    const setDI = idx => { pDI[idx] = sT ? (sP / sT) * 100 : 0; mDI[idx] = sT ? (sM / sT) * 100 : 0; };
+    setDI(p);
+    const dx = [], dxV = (a, b) => (a + b) ? (Math.abs(a - b) / (a + b)) * 100 : 0;
+    dx.push(dxV(pDI[p], mDI[p]));
+    for (let i = p; i < tr.length; i++) {
+      sT = sT - sT / p + tr[i]; sP = sP - sP / p + pd[i]; sM = sM - sM / p + md[i];
+      setDI(i + 1); dx.push(dxV(pDI[i + 1], mDI[i + 1]));
+    }
+    if (dx.length >= p) {
+      let aS = 0; for (let i = 0; i < p; i++) aS += dx[i]; let aV = aS / p;
+      adxO[p * 2] = aV;
+      for (let i = p; i < dx.length; i++) { aV = (aV * (p - 1) + dx[i]) / p; adxO[p + i] = aV; }
+    }
+    return {adx: adxO, pDI, mDI};
+  },
+  stochRSI(c, rP = 14, sP = 14, kS = 3, dS = 3) {
+    const rv = this.rsi(c, rP), out = {k: Array(c.length).fill(null), d: Array(c.length).fill(null)};
+    const raw = Array(c.length).fill(null);
+    for (let i = 0; i < c.length; i++) {
+      if (rv[i] == null) continue;
+      let hi = -Infinity, lo = Infinity, n = 0;
+      for (let j = i; j >= 0 && n < sP; j--) { if (rv[j] == null) continue; hi = Math.max(hi, rv[j]); lo = Math.min(lo, rv[j]); n++; }
+      if (n === sP && hi !== lo) raw[i] = ((rv[i] - lo) / (hi - lo)) * 100;
+    }
+    const vK = []; for (let i = 0; i < raw.length; i++) if (raw[i] != null) vK.push({i, v: raw[i]});
+    for (let i = kS - 1; i < vK.length; i++) { let s = 0; for (let j = i - kS + 1; j <= i; j++) s += vK[j].v; out.k[vK[i].i] = s / kS; }
+    const vD = []; for (let i = 0; i < out.k.length; i++) if (out.k[i] != null) vD.push({i, v: out.k[i]});
+    for (let i = dS - 1; i < vD.length; i++) { let s = 0; for (let j = i - dS + 1; j <= i; j++) s += vD[j].v; out.d[vD[i].i] = s / dS; }
+    return out;
+  },
+  vwap(candles) {
+    const o = []; let cTPV = 0, cV = 0;
+    for (const c of candles) { const tp = (c.high + c.low + c.close) / 3; cTPV += tp * c.volume; cV += c.volume; o.push(cV ? cTPV / cV : null); }
+    return o;
+  },
+  vwapBands(candles) {
+    const vwapArr = [], upper1 = [], lower1 = [], upper2 = [], lower2 = [];
+    let cTPV = 0, cV = 0, cTPV2 = 0;
+    for (let i = 0; i < candles.length; i++) {
+      const c = candles[i], tp = (c.high + c.low + c.close) / 3;
+      cTPV += tp * c.volume; cV += c.volume; cTPV2 += tp * tp * c.volume;
+      const v = cV ? cTPV / cV : null;
+      vwapArr.push(v);
+      if (v && cV) {
+        const variance = cTPV2 / cV - v * v;
+        const sd = Math.sqrt(Math.max(0, variance));
+        upper1.push(v + sd); lower1.push(v - sd);
+        upper2.push(v + 2 * sd); lower2.push(v - 2 * sd);
+      } else { upper1.push(null); lower1.push(null); upper2.push(null); lower2.push(null); }
+    }
+    return {vwap: vwapArr, upper1, lower1, upper2, lower2};
+  },
+  obv(candles) {
+    const o = [0];
+    for (let i = 1; i < candles.length; i++) o.push(o[i-1] + (candles[i].close > candles[i-1].close ? candles[i].volume : candles[i].close < candles[i-1].close ? -candles[i].volume : 0));
+    return o;
+  },
+  pivotPoints(c) {
+    const PP = (c.high + c.low + c.close) / 3;
+    return {pp:PP, r1:2*PP-c.low, s1:2*PP-c.high, r2:PP+(c.high-c.low), s2:PP-(c.high-c.low)};
+  },
+  // Compute all indicators for a set of candles
+  computeAll(candles) {
+    if (!candles || candles.length < 30) return null;
+    const closes = candles.map(c => c.close);
+    const ema9 = this.ema(closes, 9), ema21 = this.ema(closes, 21), ema50 = this.ema(closes, 50);
+    const rsi = this.rsi(closes, 14);
+    const macd = this.macd(closes);
+    const bb = this.bollinger(closes, 20, 2);
+    const atr = this.atr(candles, 14);
+    const adxData = this.adx(candles, 14);
+    const stochRsi = this.stochRSI(closes);
+    const vwapData = this.vwapBands(candles);
+    const obv = this.obv(candles);
+    return {closes, ema9, ema21, ema50, rsi, macd, bb, atr, adx: adxData, stochRsi, vwap: vwapData.vwap, vwapBands: vwapData, obv};
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SMC ENGINE (tuned for lower timeframes — 3-bar swings)
+// ═══════════════════════════════════════════════════════════════
+const SMC = {
+  swings(candles, lookback = 3) {
+    const highs = [], lows = [];
+    for (let i = lookback; i < candles.length - lookback; i++) {
+      let isHigh = true, isLow = true;
+      for (let j = 1; j <= lookback; j++) {
+        if (candles[i].high <= candles[i - j].high || candles[i].high <= candles[i + j].high) isHigh = false;
+        if (candles[i].low >= candles[i - j].low || candles[i].low >= candles[i + j].low) isLow = false;
+      }
+      if (isHigh) highs.push({i, price: candles[i].high});
+      if (isLow) lows.push({i, price: candles[i].low});
+    }
+    return {highs, lows};
+  },
+  bos_choch(candles, swings) {
+    const signals = [];
+    const {highs, lows} = swings;
+    let trend = 0; // 1=up, -1=down
+    let lastHH = null, lastLL = null;
+    for (let i = 1; i < highs.length; i++) {
+      if (lastHH && highs[i].price > lastHH.price) {
+        if (trend === 1) signals.push({type:'BOS', dir:'bull', i: highs[i].i, price: highs[i].price});
+        else { signals.push({type:'CHOCH', dir:'bull', i: highs[i].i, price: highs[i].price}); trend = 1; }
+      }
+      lastHH = highs[i];
+    }
+    for (let i = 1; i < lows.length; i++) {
+      if (lastLL && lows[i].price < lastLL.price) {
+        if (trend === -1) signals.push({type:'BOS', dir:'bear', i: lows[i].i, price: lows[i].price});
+        else { signals.push({type:'CHOCH', dir:'bear', i: lows[i].i, price: lows[i].price}); trend = -1; }
+      }
+      lastLL = lows[i];
+    }
+    return signals.sort((a, b) => a.i - b.i);
+  },
+  fvgs(candles) {
+    const gaps = [];
+    for (let i = 2; i < candles.length; i++) {
+      const prev = candles[i - 2], curr = candles[i];
+      if (curr.low > prev.high) gaps.push({type:'bull', i, top: curr.low, bottom: prev.high, filled: false});
+      else if (curr.high < prev.low) gaps.push({type:'bear', i, top: prev.low, bottom: curr.high, filled: false});
+    }
+    // Check fill status
+    for (const g of gaps) {
+      for (let j = g.i + 1; j < candles.length; j++) {
+        if (g.type === 'bull' && candles[j].low <= g.bottom) { g.filled = true; break; }
+        if (g.type === 'bear' && candles[j].high >= g.top) { g.filled = true; break; }
+      }
+    }
+    return gaps;
+  },
+  orderBlocks(candles, swings) {
+    const obs = [];
+    const {highs, lows} = swings;
+    // Bullish OB: last bearish candle before a swing low that led to rally
+    for (const lo of lows) {
+      for (let j = lo.i; j >= Math.max(0, lo.i - 5); j--) {
+        if (candles[j].close < candles[j].open) {
+          obs.push({type:'bull', i: j, top: candles[j].open, bottom: candles[j].low, origin: lo.i});
+          break;
+        }
+      }
+    }
+    // Bearish OB: last bullish candle before a swing high that led to drop
+    for (const hi of highs) {
+      for (let j = hi.i; j >= Math.max(0, hi.i - 5); j--) {
+        if (candles[j].close > candles[j].open) {
+          obs.push({type:'bear', i: j, top: candles[j].high, bottom: candles[j].close, origin: hi.i});
+          break;
+        }
+      }
+    }
+    return obs;
+  },
+  analyze(candles) {
+    if (!candles || candles.length < 20) return {swings:{highs:[],lows:[]}, signals:[], fvgs:[], obs:[]};
+    const swings = this.swings(candles, 3);
+    const signals = this.bos_choch(candles, swings);
+    const fvgs = this.fvgs(candles);
+    const obs = this.orderBlocks(candles, swings);
+    return {swings, signals, fvgs, obs};
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// STRATEGY DEFINITIONS + DETECTION
+// ═══════════════════════════════════════════════════════════════
+const STRATEGIES = [
+  {
+    id: 'vwap-bounce',
+    name: 'VWAP Bounce',
+    category: 'Indicator',
+    difficulty: 1,
+    bestTF: '5m, 15m',
+    bestSession: 'London, New York',
+    overview: 'VWAP (Volume Weighted Average Price) acts as an institutional magnet. When price pulls back to VWAP during a trend, it often bounces. This is one of the highest-probability scalp setups because institutions use VWAP as a benchmark for execution.',
+    howItWorks: 'In an uptrend, price pulls back to VWAP and finds support. The VWAP represents the average price weighted by volume — it shows where the real money transacted. When price returns to this level, institutional buyers step in because they can buy at or below the average.',
+    entryRules: ['Price must be in a clear trend (EMA 9 > EMA 21 for longs)', 'Price pulls back and touches or wicks through VWAP', 'Wait for a bullish/bearish confirmation candle at VWAP', 'RSI should be between 40-60 (not already overbought/oversold)', 'Volume should increase on the bounce candle'],
+    slRule: 'Place stop loss 1 ATR below VWAP (longs) or above VWAP (shorts)',
+    tpRule: 'TP1 at previous swing high/low. TP2 at 2x risk distance',
+    tips: ['Best when ADX > 20 (trending market)', 'Avoid first 5 minutes of session — wait for VWAP to stabilize', 'Strongest bounces come with volume spike at VWAP touch'],
+    mistakes: ['Entering before confirmation candle completes', 'Trading VWAP bounce in a choppy/ranging market', 'Ignoring the higher timeframe trend'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 5 || !ind.vwap[L] || !ind.ema9[L] || !ind.ema21[L] || !ind.atr[L]) return null;
+      const price = candles[L].close, vwap = ind.vwap[L], atr = ind.atr[L];
+      const nearVwap = Math.abs(price - vwap) / price < 0.002;
+      const touchedVwap = candles[L].low <= vwap * 1.002 && candles[L].low >= vwap * 0.998;
+      const bullCandle = candles[L].close > candles[L].open;
+      const bearCandle = candles[L].close < candles[L].open;
+      const bullTrend = ind.ema9[L] > ind.ema21[L];
+      const bearTrend = ind.ema9[L] < ind.ema21[L];
+      const rsi = ind.rsi[L];
+      if (touchedVwap && bullCandle && bullTrend && rsi > 35 && rsi < 65) {
+        return {dir:'long', conf:72, entry:price, sl:vwap - atr, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price bounced off VWAP in uptrend with bullish candle confirmation'};
+      }
+      const touchedAbove = candles[L].high >= vwap * 0.998 && candles[L].high <= vwap * 1.002;
+      if (touchedAbove && bearCandle && bearTrend && rsi > 35 && rsi < 65) {
+        return {dir:'short', conf:72, entry:price, sl:vwap + atr, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price rejected at VWAP in downtrend with bearish candle confirmation'};
+      }
+      return null;
+    }
+  },
+  {
+    id: 'vwap-band-reversion',
+    name: 'VWAP Band Mean Reversion',
+    category: 'Indicator',
+    difficulty: 2,
+    bestTF: '5m, 15m',
+    bestSession: 'Any active session',
+    overview: 'When price extends to the 2nd standard deviation VWAP band, it is statistically overextended. This strategy fades the move back toward VWAP, similar to Bollinger Band mean reversion but anchored to volume.',
+    howItWorks: 'VWAP deviation bands show 1 and 2 standard deviations from VWAP. Price beyond the 2nd band means extreme extension. About 95% of price action stays within 2 standard deviations, so touches of the outer band often revert to VWAP.',
+    entryRules: ['Price touches or exceeds the 2nd VWAP deviation band', 'Stochastic RSI is in extreme territory (>80 or <20)', 'A reversal candle forms (pin bar, engulfing, or doji)', 'Volume is declining on the extension (exhaustion)'],
+    slRule: 'Stop loss beyond the 2nd VWAP band + 0.5 ATR',
+    tpRule: 'TP1 at 1st VWAP band. TP2 at VWAP itself',
+    tips: ['Higher probability during range-bound days', 'Check higher TF — avoid if strong trend with no pullbacks', 'Best combined with RSI divergence for extra confirmation'],
+    mistakes: ['Fading a strong trend breakout', 'Not waiting for the reversal candle', 'Setting TP too aggressively — VWAP is usually enough'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 5 || !ind.vwapBands) return null;
+      const {upper2, lower2, upper1, lower1, vwap} = ind.vwapBands;
+      if (!upper2[L] || !ind.stochRsi.k[L] || !ind.atr[L]) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      const stK = ind.stochRsi.k[L];
+      if (candles[L].high >= upper2[L] && stK > 75) {
+        const revCandle = candles[L].close < candles[L].open || (candles[L].high - candles[L].close) > (candles[L].close - candles[L].low) * 2;
+        if (revCandle) return {dir:'short', conf:68, entry:price, sl:upper2[L] + atr * 0.5, tp1:upper1[L], tp2:vwap[L], reason:'Price at upper 2σ VWAP band with overbought StochRSI — mean reversion short'};
+      }
+      if (candles[L].low <= lower2[L] && stK < 25) {
+        const revCandle = candles[L].close > candles[L].open || (candles[L].close - candles[L].low) > (candles[L].high - candles[L].close) * 2;
+        if (revCandle) return {dir:'long', conf:68, entry:price, sl:lower2[L] - atr * 0.5, tp1:lower1[L], tp2:vwap[L], reason:'Price at lower 2σ VWAP band with oversold StochRSI — mean reversion long'};
+      }
+      return null;
+    }
+  },
+  {
+    id: 'ema-cross',
+    name: '9/21 EMA Crossover',
+    category: 'Indicator',
+    difficulty: 1,
+    bestTF: '5m, 15m',
+    bestSession: 'London, New York',
+    overview: 'The EMA crossover is the bread-and-butter scalp signal. When the fast EMA (9) crosses the slow EMA (21), it signals a momentum shift. Simple but effective with proper filters.',
+    howItWorks: 'The 9 EMA responds faster to price changes than the 21 EMA. When the 9 crosses above the 21, buyers have taken control of short-term momentum. The key is filtering false crosses using trend context (price relative to 50 EMA) and momentum (MACD direction).',
+    entryRules: ['9 EMA crosses above 21 EMA (long) or below (short)', 'Price is above 50 EMA for longs, below for shorts (trend filter)', 'MACD histogram must be moving in the trade direction', 'Wait for the cross candle to close — do not front-run', 'Volume should be above average on the cross candle'],
+    slRule: 'Stop below the 21 EMA - 0.5 ATR (longs) or above + 0.5 ATR (shorts)',
+    tpRule: 'TP1 at 1.5x risk. TP2 at 2x risk or next structure level',
+    tips: ['Best in trending markets (ADX > 25)', 'Avoid crosses that happen within a tight range', 'The first cross after a trend reversal is strongest'],
+    mistakes: ['Trading every single cross (many are false in ranging markets)', 'Not using a trend filter — crosses chop in sideways action', 'Entering on the wick instead of waiting for candle close'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1, P = L - 1;
+      if (P < 1 || !ind.ema9[L] || !ind.ema21[L] || !ind.ema9[P] || !ind.ema21[P] || !ind.atr[L]) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      const bullCross = ind.ema9[P] <= ind.ema21[P] && ind.ema9[L] > ind.ema21[L];
+      const bearCross = ind.ema9[P] >= ind.ema21[P] && ind.ema9[L] < ind.ema21[L];
+      const aboveEma50 = ind.ema50[L] && price > ind.ema50[L];
+      const belowEma50 = ind.ema50[L] && price < ind.ema50[L];
+      const macdBull = ind.macd.hist[L] > 0 || (ind.macd.hist[L] > ind.macd.hist[P]);
+      const macdBear = ind.macd.hist[L] < 0 || (ind.macd.hist[L] < ind.macd.hist[P]);
+      if (bullCross && aboveEma50 && macdBull) {
+        return {dir:'long', conf:70, entry:price, sl:ind.ema21[L] - atr * 0.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'9 EMA crossed above 21 EMA with price above 50 EMA — bullish momentum'};
+      }
+      if (bearCross && belowEma50 && macdBear) {
+        return {dir:'short', conf:70, entry:price, sl:ind.ema21[L] + atr * 0.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'9 EMA crossed below 21 EMA with price below 50 EMA — bearish momentum'};
+      }
+      return null;
+    }
+  },
+  {
+    id: 'rsi-divergence',
+    name: 'RSI Divergence',
+    category: 'Indicator',
+    difficulty: 2,
+    bestTF: '5m, 15m',
+    bestSession: 'Any',
+    overview: 'RSI divergence occurs when price makes a new high/low but RSI does not confirm. This is one of the most powerful reversal signals because it shows momentum is exhausting before price catches up.',
+    howItWorks: 'Bullish divergence: price makes a lower low, but RSI makes a higher low — sellers are weakening. Bearish divergence: price makes a higher high, but RSI makes a lower high — buyers are fading. The divergence is the early warning; the entry comes when price confirms the reversal.',
+    entryRules: ['Identify divergence between price and RSI on the last 10-20 candles', 'Wait for a confirmation candle (bullish engulfing for bull div, bearish for bear)', 'RSI should cross back above 30 (bull) or below 70 (bear)', 'Best when divergence happens at a key level (VWAP, EMA, support/resistance)'],
+    slRule: 'Stop below the divergence low (bull) or above the divergence high (bear)',
+    tpRule: 'TP1 at the most recent swing level. TP2 at 2x risk',
+    tips: ['Double divergence (two consecutive divergences) is extremely powerful', 'Works best at the end of moves, not in the middle of strong trends', 'Combine with SMC order blocks for maximum confluence'],
+    mistakes: ['Trading divergence against a very strong trend', 'Not waiting for confirmation — divergence can persist', 'Looking for divergence on too small a sample (need at least 10 candles)'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 20 || !ind.rsi[L] || !ind.atr[L]) return null;
+      const atr = ind.atr[L], price = candles[L].close;
+      // Look back 15 candles for swing points
+      let recentLow1 = null, recentLow2 = null, recentHigh1 = null, recentHigh2 = null;
+      for (let i = L; i >= L - 15; i--) {
+        if (i < 2 || !ind.rsi[i]) continue;
+        const isLow = candles[i].low <= candles[i-1].low && candles[i].low <= candles[i-2]?.low;
+        const isHigh = candles[i].high >= candles[i-1].high && candles[i].high >= candles[i-2]?.high;
+        if (isLow && !recentLow1) recentLow1 = {i, price: candles[i].low, rsi: ind.rsi[i]};
+        else if (isLow && !recentLow2) recentLow2 = {i, price: candles[i].low, rsi: ind.rsi[i]};
+        if (isHigh && !recentHigh1) recentHigh1 = {i, price: candles[i].high, rsi: ind.rsi[i]};
+        else if (isHigh && !recentHigh2) recentHigh2 = {i, price: candles[i].high, rsi: ind.rsi[i]};
+      }
+      // Bullish divergence: price lower low, RSI higher low
+      if (recentLow1 && recentLow2 && recentLow1.price < recentLow2.price && recentLow1.rsi > recentLow2.rsi && ind.rsi[L] < 45) {
+        const bullCandle = candles[L].close > candles[L].open;
+        if (bullCandle) return {dir:'long', conf:74, entry:price, sl:recentLow1.price - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish RSI divergence — price made lower low but RSI made higher low'};
+      }
+      // Bearish divergence: price higher high, RSI lower high
+      if (recentHigh1 && recentHigh2 && recentHigh1.price > recentHigh2.price && recentHigh1.rsi < recentHigh2.rsi && ind.rsi[L] > 55) {
+        const bearCandle = candles[L].close < candles[L].open;
+        if (bearCandle) return {dir:'short', conf:74, entry:price, sl:recentHigh1.price + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish RSI divergence — price made higher high but RSI made lower high'};
+      }
+      return null;
+    }
+  },
+  {
+    id: 'bb-squeeze',
+    name: 'Bollinger Squeeze Breakout',
+    category: 'Indicator',
+    difficulty: 2,
+    bestTF: '15m, 1h',
+    bestSession: 'London Open, NY Open',
+    overview: 'When Bollinger Bands contract (squeeze), volatility is compressing like a coiled spring. The breakout from a squeeze often produces powerful directional moves. This strategy catches the breakout.',
+    howItWorks: 'Bollinger Bandwidth measures the distance between bands as a percentage. When bandwidth drops to its lowest in 50+ periods, a squeeze is forming. The breakout direction is determined by the first strong candle that closes outside the bands. Volume confirms the breakout.',
+    entryRules: ['Bollinger Bandwidth must be at its lowest in the last 50 candles', 'Wait for a candle to close outside the bands', 'Volume on the breakout candle must be above the 20-period average', 'MACD must be moving in the breakout direction', 'Enter on the close of the breakout candle'],
+    slRule: 'Stop at the opposite Bollinger Band or the middle band, whichever is closer to entry',
+    tpRule: 'TP1 at 1.5x the Bollinger Band width. TP2 at 2x the width',
+    tips: ['The longer the squeeze lasts, the more powerful the breakout', 'Kill zone timing (London/NY open) squeezes tend to break hardest', 'Use ADX rising from below 20 as extra confirmation'],
+    mistakes: ['Entering during the squeeze before the breakout', 'Ignoring volume — low-volume breakouts often fail', 'Not respecting the squeeze and getting chopped out with early entries'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 50 || !ind.bb.bw[L] || !ind.atr[L]) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      // Check if BB width is near its low
+      let minBW = Infinity;
+      for (let i = L - 50; i < L; i++) { if (ind.bb.bw[i] != null && ind.bb.bw[i] < minBW) minBW = ind.bb.bw[i]; }
+      const isSqueeze = ind.bb.bw[L] < minBW * 1.15;
+      if (!isSqueeze) return null;
+      const closeAboveUpper = price > ind.bb.upper[L];
+      const closeBelowLower = price < ind.bb.lower[L];
+      const avgVol = candles.slice(L - 20, L).reduce((s, c) => s + c.volume, 0) / 20;
+      const highVol = candles[L].volume > avgVol;
+      if (closeAboveUpper && highVol) {
+        return {dir:'long', conf:76, entry:price, sl:ind.bb.middle[L], tp1:price + (ind.bb.upper[L] - ind.bb.lower[L]) * 1.5, tp2:price + (ind.bb.upper[L] - ind.bb.lower[L]) * 2, reason:'Bollinger Squeeze breakout to the upside with volume confirmation'};
+      }
+      if (closeBelowLower && highVol) {
+        return {dir:'short', conf:76, entry:price, sl:ind.bb.middle[L], tp1:price - (ind.bb.upper[L] - ind.bb.lower[L]) * 1.5, tp2:price - (ind.bb.upper[L] - ind.bb.lower[L]) * 2, reason:'Bollinger Squeeze breakout to the downside with volume confirmation'};
+      }
+      return null;
+    }
+  },
+  {
+    id: 'macd-hist-reversal',
+    name: 'MACD Histogram Reversal',
+    category: 'Indicator',
+    difficulty: 1,
+    bestTF: '5m, 15m',
+    bestSession: 'Any',
+    overview: 'The MACD histogram shows the distance between the MACD line and signal line. When the histogram reverses direction after reaching an extreme, it signals momentum is shifting before the lines actually cross.',
+    howItWorks: 'Watch for the histogram to peak (tallest bar) then start declining. This early momentum shift often precedes the actual MACD line crossover by several candles, giving you an early entry.',
+    entryRules: ['MACD histogram must have been growing for at least 3 bars', 'Current bar shows first reversal (shrinking histogram)', 'Price action confirms — look for a reversal candle', 'RSI supports the reversal (coming from extreme territory)'],
+    slRule: 'Stop beyond the recent swing created by the histogram peak',
+    tpRule: 'TP1 at the zero-line cross level. TP2 at next support/resistance',
+    tips: ['Works best after extended moves (5+ bars in one direction)', 'Combine with support/resistance for entry precision', 'The bigger the histogram extreme, the stronger the reversal signal'],
+    mistakes: ['Entering on the first histogram shrinkage (wait for confirmation)', 'Trading histogram reversals in choppy markets', 'Ignoring the overall trend — small reversals in strong trends fail'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1, P = L - 1, P2 = L - 2;
+      if (P2 < 0 || !ind.macd.hist[L] || !ind.macd.hist[P] || !ind.macd.hist[P2] || !ind.atr[L]) return null;
+      const h = ind.macd.hist, price = candles[L].close, atr = ind.atr[L];
+      // Bull reversal: histogram was negative and getting more negative, now less negative
+      if (h[P2] < h[P] - 0.5 && h[P] < 0 && h[L] > h[P] && h[L] < 0) {
+        return {dir:'long', conf:62, entry:price, sl:price - atr * 1.2, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'MACD histogram reversing from negative extreme — early bullish momentum shift'};
+      }
+      // Bear reversal: histogram was positive and growing, now shrinking
+      if (h[P2] > h[P] + 0.5 && h[P] > 0 && h[L] < h[P] && h[L] > 0) {
+        return {dir:'short', conf:62, entry:price, sl:price + atr * 1.2, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'MACD histogram reversing from positive extreme — early bearish momentum shift'};
+      }
+      return null;
+    }
+  },
+  {
+    id: 'stoch-rsi-extreme',
+    name: 'Stochastic RSI Reversal',
+    category: 'Indicator',
+    difficulty: 1,
+    bestTF: '5m, 15m',
+    bestSession: 'Any',
+    overview: 'Stochastic RSI combines the sensitivity of Stochastic with the momentum-tracking of RSI. When both K and D lines are in extreme territory and cross, it is a high-probability reversal signal.',
+    howItWorks: 'When StochRSI K line drops below 20 and then crosses above the D line, momentum is shifting from oversold. When K rises above 80 and crosses below D, momentum is shifting from overbought. The actual reversal is confirmed by price action.',
+    entryRules: ['StochRSI K must be below 20 (long) or above 80 (short)', 'K line crosses D line in the extreme zone', 'A confirmation candle forms in the trade direction', 'EMA trend should support the direction or be neutral'],
+    slRule: 'Stop below the low of the oversold/overbought zone candles + 0.3 ATR',
+    tpRule: 'TP1 when StochRSI reaches 50. TP2 when it reaches the opposite extreme',
+    tips: ['Most reliable when combined with VWAP proximity', 'Double-bottom in StochRSI (oversold twice) is very strong', 'Avoid trading crosses in the middle zone (30-70)'],
+    mistakes: ['Entering just because StochRSI is extreme (it can stay extreme in trends)', 'Not waiting for the actual cross', 'Using StochRSI alone without price action confirmation'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1, P = L - 1;
+      if (!ind.stochRsi.k[L] || !ind.stochRsi.d[L] || !ind.stochRsi.k[P] || !ind.stochRsi.d[P] || !ind.atr[L]) return null;
+      const kL = ind.stochRsi.k[L], dL = ind.stochRsi.d[L], kP = ind.stochRsi.k[P], dP = ind.stochRsi.d[P];
+      const price = candles[L].close, atr = ind.atr[L];
+      // Bull: K crossed above D in oversold
+      if (kP <= dP && kL > dL && kL < 30) {
+        return {dir:'long', conf:65, entry:price, sl:price - atr * 1.0, tp1:price + atr * 1.2, tp2:price + atr * 2.0, reason:'StochRSI bullish cross in oversold territory'};
+      }
+      // Bear: K crossed below D in overbought
+      if (kP >= dP && kL < dL && kL > 70) {
+        return {dir:'short', conf:65, entry:price, sl:price + atr * 1.0, tp1:price - atr * 1.2, tp2:price - atr * 2.0, reason:'StochRSI bearish cross in overbought territory'};
+      }
+      return null;
+    }
+  },
+  {
+    id: 'ob-entry',
+    name: 'Order Block Entry',
+    category: 'SMC',
+    difficulty: 2,
+    bestTF: '5m, 15m',
+    bestSession: 'London, New York',
+    overview: 'Order Blocks are the last opposing candle before a significant move. They represent zones where institutions placed large orders. When price returns to an OB, institutional orders are sitting there waiting to be filled again.',
+    howItWorks: 'A bullish Order Block is the last bearish candle before a strong rally. A bearish OB is the last bullish candle before a strong drop. When price pulls back to an OB, it often reacts because resting institutional orders get triggered at that level.',
+    entryRules: ['Identify a valid OB (must have caused a significant move — Break of Structure)', 'Price returns to the OB zone for the first time (first touch is strongest)', 'A reaction candle forms within the OB (rejection wick, engulfing)', 'The trend on the higher timeframe supports the OB direction', 'Volume should spike at the OB touch'],
+    slRule: 'Stop below the OB low (bull) or above the OB high (bear) + small buffer',
+    tpRule: 'TP1 at the recent swing that the OB created. TP2 at the next OB in the opposite direction',
+    tips: ['Fresh (untested) OBs are strongest — first touch has the highest reaction probability', 'OBs that caused a Break of Structure are more significant', 'Smaller OBs on lower timeframes give tighter stops and better R:R'],
+    mistakes: ['Trading OBs that have already been tested (mitigated)', 'Ignoring the trend — counter-trend OBs fail more often', 'Not waiting for a reaction at the OB — just entering because price reached it'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 10 || !ind.atr[L]) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      // Find recent untouched OBs that price is near
+      const recentOBs = smc.obs.filter(ob => ob.i > L - 50 && ob.i < L - 3);
+      for (const ob of recentOBs.reverse()) {
+        const inZone = price >= ob.bottom && price <= ob.top;
+        if (!inZone) continue;
+        // Check if this OB has been tested before
+        let tested = false;
+        for (let j = ob.i + 3; j < L - 1; j++) {
+          if (candles[j].low <= ob.top && candles[j].high >= ob.bottom) { tested = true; break; }
+        }
+        if (tested) continue;
+        if (ob.type === 'bull' && candles[L].close > candles[L].open) {
+          return {dir:'long', conf:78, entry:price, sl:ob.bottom - atr * 0.3, tp1:price + atr * 2, tp2:price + atr * 3, reason:'Price reacting at fresh bullish Order Block — institutional buy zone'};
+        }
+        if (ob.type === 'bear' && candles[L].close < candles[L].open) {
+          return {dir:'short', conf:78, entry:price, sl:ob.top + atr * 0.3, tp1:price - atr * 2, tp2:price - atr * 3, reason:'Price reacting at fresh bearish Order Block — institutional sell zone'};
+        }
+      }
+      return null;
+    }
+  },
+  {
+    id: 'fvg-fill',
+    name: 'Fair Value Gap Fill',
+    category: 'SMC',
+    difficulty: 2,
+    bestTF: '5m, 15m',
+    bestSession: 'London, New York',
+    overview: 'Fair Value Gaps (FVGs) are three-candle patterns where the wicks do not overlap, creating a price void. The market tends to fill these gaps. Trading the fill and subsequent continuation is a bread-and-butter SMC scalp.',
+    howItWorks: 'A bullish FVG forms when candle 3\'s low is above candle 1\'s high — the gap between is a void the market wants to fill. Price often retraces into the FVG, then continues in the original direction. The FVG acts as a magnet and then a launchpad.',
+    entryRules: ['Identify an unfilled FVG in the direction of the trend', 'Wait for price to retrace INTO the FVG (at least 50% fill)', 'A rejection candle forms within the FVG', 'The FVG should be fresh (not previously filled)', 'Higher TF trend supports the direction'],
+    slRule: 'Stop below the FVG bottom (bull) or above the FVG top (bear)',
+    tpRule: 'TP1 at the swing that created the FVG. TP2 at the next structural level',
+    tips: ['FVGs that form during high-volume sessions fill more reliably', '50% of the FVG is the optimal entry — price often reacts there', 'Multiple FVGs stacked together create a strong support/resistance zone'],
+    mistakes: ['Trading fills against the trend', 'Entering before price actually enters the FVG', 'Expecting all FVGs to fill — some create continuation gaps that never fill'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 10 || !ind.atr[L]) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      const recentFVGs = smc.fvgs.filter(g => !g.filled && g.i > L - 40 && g.i < L - 2);
+      for (const g of recentFVGs.reverse()) {
+        const mid = (g.top + g.bottom) / 2;
+        const inGap = price >= g.bottom && price <= g.top;
+        if (!inGap) continue;
+        if (g.type === 'bull' && candles[L].close > candles[L].open) {
+          return {dir:'long', conf:73, entry:price, sl:g.bottom - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price filling into bullish FVG with rejection — expecting continuation higher'};
+        }
+        if (g.type === 'bear' && candles[L].close < candles[L].open) {
+          return {dir:'short', conf:73, entry:price, sl:g.top + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price filling into bearish FVG with rejection — expecting continuation lower'};
+        }
+      }
+      return null;
+    }
+  },
+  {
+    id: 'bos-continuation',
+    name: 'Break of Structure Pullback',
+    category: 'SMC',
+    difficulty: 2,
+    bestTF: '5m, 15m',
+    bestSession: 'London, New York',
+    overview: 'After a Break of Structure (BOS), price often pulls back before continuing. This pullback entry is one of the highest-probability SMC trades because the structure break confirms the direction.',
+    howItWorks: 'BOS occurs when price breaks a previous swing high (bullish) or swing low (bearish). After the break, price typically retraces 50-79% of the move. Entering on this pullback — especially into an OB or FVG within the retracement — gives excellent R:R.',
+    entryRules: ['A clear BOS must have occurred (previous swing broken)', 'Wait for a pullback of 38-79% of the BOS move', 'Enter when price shows rejection at the pullback level', 'Ideally the pullback lands on an OB or FVG', 'Volume should decrease on pullback, increase on continuation'],
+    slRule: 'Stop below the origin of the BOS move (longs) or above it (shorts)',
+    tpRule: 'TP1 at the BOS level. TP2 at a measured move equal to the BOS leg',
+    tips: ['The first pullback after a BOS is the strongest', 'If the pullback retraces more than 100%, the BOS is invalidated', 'Look for CHOCH on the lower timeframe to time the pullback end'],
+    mistakes: ['Entering the BOS breakout itself (chasing)', 'Not waiting for the pullback (entering immediately)', 'Ignoring volume — strong pullbacks with high volume might be reversals'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 10 || !ind.atr[L]) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      const recentBOS = smc.signals.filter(s => s.type === 'BOS' && s.i > L - 30 && s.i < L - 2);
+      for (const bos of recentBOS.reverse()) {
+        if (bos.dir === 'bull') {
+          const moveHigh = bos.price;
+          const pullbackPct = (moveHigh - price) / (moveHigh - candles[bos.i - 3]?.low || price) || 0;
+          if (pullbackPct > 0.3 && pullbackPct < 0.8 && candles[L].close > candles[L].open) {
+            return {dir:'long', conf:75, entry:price, sl:price - atr * 1.5, tp1:moveHigh, tp2:moveHigh + atr * 2, reason:'Bullish BOS pullback entry — structure broken, buying the retracement'};
+          }
+        }
+        if (bos.dir === 'bear') {
+          const moveLow = bos.price;
+          const pullbackPct = (price - moveLow) / (candles[bos.i - 3]?.high - moveLow || price) || 0;
+          if (pullbackPct > 0.3 && pullbackPct < 0.8 && candles[L].close < candles[L].open) {
+            return {dir:'short', conf:75, entry:price, sl:price + atr * 1.5, tp1:moveLow, tp2:moveLow - atr * 2, reason:'Bearish BOS pullback entry — structure broken, selling the retracement'};
+          }
+        }
+      }
+      return null;
+    }
+  },
+  {
+    id: 'liquidity-sweep',
+    name: 'Liquidity Sweep Reversal',
+    category: 'SMC',
+    difficulty: 3,
+    bestTF: '5m, 15m',
+    bestSession: 'London Open, NY Open',
+    overview: 'Smart money hunts liquidity — they push price through obvious highs/lows to trigger stop losses and market orders, then reverse. This is the "stop hunt" in action. Catching the reversal after a liquidity sweep is an advanced but highly profitable scalp.',
+    howItWorks: 'Liquidity pools sit above swing highs (buy stops) and below swing lows (sell stops). Institutions drive price into these pools to fill their large orders. The sweep shows as a spike through a level followed by immediate rejection. The key is waiting for the rejection candle.',
+    entryRules: ['Identify obvious swing highs/lows where stops would cluster', 'Price spikes beyond the level (the sweep)', 'Immediate rejection: a candle that closes back inside the range', 'The rejection candle should have a long wick beyond the level', 'Enter on the close of the rejection candle', 'Volume spike on the sweep confirms institutional activity'],
+    slRule: 'Stop beyond the wick of the sweep candle',
+    tpRule: 'TP1 at the opposite side of the range. TP2 at the next liquidity pool',
+    tips: ['Kill zones are prime time for liquidity sweeps', 'Equal highs/lows are the strongest liquidity targets', 'If multiple timeframes show the same liquidity level, the sweep is more significant'],
+    mistakes: ['Entering during the sweep before the rejection candle', 'Not confirming the sweep with a close back inside the range', 'Trading sweeps in the middle of nowhere (need a clear level)'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 10 || !ind.atr[L]) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      const {highs, lows} = smc.swings;
+      // Check if last candle swept a recent high and rejected
+      for (const hi of highs.slice(-5).reverse()) {
+        if (hi.i > L - 3) continue;
+        if (candles[L].high > hi.price && candles[L].close < hi.price) {
+          const wickRatio = (candles[L].high - candles[L].close) / (candles[L].high - candles[L].low);
+          if (wickRatio > 0.5) {
+            return {dir:'short', conf:80, entry:price, sl:candles[L].high + atr * 0.2, tp1:price - atr * 2, tp2:price - atr * 3, reason:'Liquidity sweep of swing high — wick rejected above level, reversal expected'};
+          }
+        }
+      }
+      // Check if last candle swept a recent low and rejected
+      for (const lo of lows.slice(-5).reverse()) {
+        if (lo.i > L - 3) continue;
+        if (candles[L].low < lo.price && candles[L].close > lo.price) {
+          const wickRatio = (candles[L].close - candles[L].low) / (candles[L].high - candles[L].low);
+          if (wickRatio > 0.5) {
+            return {dir:'long', conf:80, entry:price, sl:candles[L].low - atr * 0.2, tp1:price + atr * 2, tp2:price + atr * 3, reason:'Liquidity sweep of swing low — wick rejected below level, reversal expected'};
+          }
+        }
+      }
+      return null;
+    }
+  },
+  {
+    id: 'kill-zone',
+    name: 'Kill Zone Momentum',
+    category: 'Session',
+    difficulty: 2,
+    bestTF: '5m, 15m',
+    bestSession: 'First 30 min of London/NY',
+    overview: 'Kill Zones are the opening periods of major trading sessions (London, New York) when institutional volume floods in. The first directional move in a kill zone often sets the tone. Getting in early on this move is the scalper\'s bread and butter.',
+    howItWorks: 'London Open (08:00-08:30 UTC) and NY Open (13:30-14:00 UTC) see massive volume influx. The first 15-30 minutes often produce the largest moves of the session. The strategy: wait for the first clear directional push, confirm it, and ride it.',
+    entryRules: ['Must be within the first 30 minutes of London or NY open', 'Wait for the first 2-3 candles to establish direction', 'Price breaks above/below the session opening range (first 5-minute range)', 'Volume must be above the previous session average', 'EMA 9 and 21 should align with the break direction'],
+    slRule: 'Stop at the opposite side of the session opening range',
+    tpRule: 'TP1 at 1x the opening range width. TP2 at the average session range (ATR)',
+    tips: ['The highest probability kill zone trades are in the direction of the daily trend', 'If price sweeps the opening range low then breaks high, that is extremely powerful', 'Pre-kill zone consolidation (last hour before open) sets up the strongest moves'],
+    mistakes: ['Trading in the first 2-3 minutes (too noisy)', 'Trading both London AND NY kills in the same direction (often NY reverses London)', 'Ignoring the bigger picture — kill zones fail if a major news event disrupts the flow'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 10 || !ind.atr[L] || !ind.ema9[L] || !ind.ema21[L]) return null;
+      const now = new Date();
+      const utcH = now.getUTCHours(), utcM = now.getUTCMinutes();
+      const isLondonKZ = (utcH === 8 && utcM < 30) || (utcH === 7 && utcM >= 55);
+      const isNYKZ = (utcH === 13 && utcM >= 30) || (utcH === 14 && utcM < 15);
+      if (!isLondonKZ && !isNYKZ) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      const bullish = ind.ema9[L] > ind.ema21[L] && candles[L].close > candles[L].open;
+      const bearish = ind.ema9[L] < ind.ema21[L] && candles[L].close < candles[L].open;
+      const session = isLondonKZ ? 'London' : 'New York';
+      if (bullish) {
+        return {dir:'long', conf:71, entry:price, sl:price - atr * 1.0, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:`${session} Kill Zone — bullish momentum with EMA alignment`};
+      }
+      if (bearish) {
+        return {dir:'short', conf:71, entry:price, sl:price + atr * 1.0, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:`${session} Kill Zone — bearish momentum with EMA alignment`};
+      }
+      return null;
+    }
+  },
+  {
+    id: 'candle-pattern',
+    name: 'Candlestick Pattern Scalp',
+    category: 'Price Action',
+    difficulty: 1,
+    bestTF: '5m, 15m',
+    bestSession: 'Any active session',
+    overview: 'Classic candlestick patterns — engulfing, pin bars, and hammers — remain powerful on lower timeframes. When they form at key levels (VWAP, EMA, OB), they become high-probability scalp entries.',
+    howItWorks: 'A bullish engulfing completely covers the previous candle\'s body with a bullish body. A pin bar (hammer) has a long lower wick and small body, showing rejection. These patterns show the battle between buyers and sellers, and at key levels, they signal the winner.',
+    entryRules: ['A clear pattern forms (engulfing, pin bar, hammer, doji)', 'The pattern must be at a significant level (VWAP, EMA, OB, support/resistance)', 'Confirm with volume — the pattern candle should have above-average volume', 'Enter on the close of the pattern candle or on a break of its high/low'],
+    slRule: 'Stop below the pattern candle low (bull) or above its high (bear)',
+    tpRule: 'TP1 at 1.5x risk. TP2 at next structure level',
+    tips: ['Patterns at confluence of multiple levels are much stronger', 'The larger the pattern candle relative to recent candles, the stronger the signal', 'Engulfing patterns that also break a swing level are the most powerful'],
+    mistakes: ['Trading every single candlestick pattern (most fail without context)', 'Ignoring the location — patterns in no-man\'s land are meaningless', 'Not waiting for the candle to close (wicks can extend)'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1, P = L - 1;
+      if (P < 0 || !ind.atr[L]) return null;
+      const c = candles[L], p = candles[P], price = c.close, atr = ind.atr[L];
+      const cBody = Math.abs(c.close - c.open), pBody = Math.abs(p.close - p.open);
+      const cRange = c.high - c.low;
+      // Bullish engulfing
+      const bullEngulf = c.close > c.open && p.close < p.open && c.close > p.open && c.open < p.close && cBody > pBody * 1.2;
+      // Bearish engulfing
+      const bearEngulf = c.close < c.open && p.close > p.open && c.close < p.open && c.open > p.close && cBody > pBody * 1.2;
+      // Pin bar / hammer (long lower wick)
+      const lowerWick = Math.min(c.open, c.close) - c.low;
+      const upperWick = c.high - Math.max(c.open, c.close);
+      const bullPin = lowerWick > cBody * 2 && upperWick < cBody * 0.5 && cRange > 0;
+      const bearPin = upperWick > cBody * 2 && lowerWick < cBody * 0.5 && cRange > 0;
+      // Check if at a key level (VWAP or EMA)
+      const nearVwap = ind.vwap[L] && Math.abs(price - ind.vwap[L]) / price < 0.003;
+      const nearEma = (ind.ema21[L] && Math.abs(price - ind.ema21[L]) / price < 0.002) || (ind.ema50[L] && Math.abs(price - ind.ema50[L]) / price < 0.002);
+      const atLevel = nearVwap || nearEma;
+      if (bullEngulf && atLevel) return {dir:'long', conf:67, entry:price, sl:c.low - atr * 0.2, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish engulfing at key level — buyers overwhelmed sellers'};
+      if (bearEngulf && atLevel) return {dir:'short', conf:67, entry:price, sl:c.high + atr * 0.2, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish engulfing at key level — sellers overwhelmed buyers'};
+      if (bullPin && atLevel) return {dir:'long', conf:64, entry:price, sl:c.low - atr * 0.2, tp1:price + atr * 1.5, tp2:price + atr * 2, reason:'Bullish pin bar at key level — strong rejection of lower prices'};
+      if (bearPin && atLevel) return {dir:'short', conf:64, entry:price, sl:c.high + atr * 0.2, tp1:price - atr * 1.5, tp2:price - atr * 2, reason:'Bearish pin bar at key level — strong rejection of higher prices'};
+      return null;
+    }
+  },
+  {
+    id: 'choch-reversal',
+    name: 'Change of Character (CHOCH)',
+    category: 'SMC',
+    difficulty: 3,
+    bestTF: '5m, 15m',
+    bestSession: 'London, New York',
+    overview: 'Change of Character marks the FIRST break of the current trend structure — it is the earliest signal that a trend is reversing. While BOS confirms trend continuation, CHOCH signals the tide is turning.',
+    howItWorks: 'In an uptrend, price makes higher highs and higher lows. A CHOCH occurs when price breaks below the most recent higher low — the first lower low. This break signals the uptrend structure is compromised. The entry comes on the pullback after the CHOCH.',
+    entryRules: ['A clear CHOCH has occurred (first structural break against the trend)', 'Wait for a pullback after the CHOCH (do not chase the break)', 'Enter when the pullback shows rejection (candle pattern, OB, FVG)', 'Volume should decrease on the pullback and increase on the reversal', 'Higher timeframe momentum should be shifting (RSI coming from extreme)'],
+    slRule: 'Stop beyond the CHOCH swing point (the high for bear CHOCH, the low for bull CHOCH)',
+    tpRule: 'TP1 at the next structural level. TP2 at the measured move of the CHOCH leg',
+    tips: ['CHOCH at session opens (kill zones) are the most reliable', 'CHOCH confirmed by volume divergence is extremely powerful', 'The first CHOCH after a long trend is more significant than later ones'],
+    mistakes: ['Entering every CHOCH — some are just retests before continuation', 'Not waiting for the pullback entry', 'Trading CHOCH in ranging/choppy markets where there is no clear structure'],
+    detect(ind, candles, smc) {
+      const L = candles.length - 1;
+      if (L < 10 || !ind.atr[L]) return null;
+      const price = candles[L].close, atr = ind.atr[L];
+      const recentCHOCH = smc.signals.filter(s => s.type === 'CHOCH' && s.i > L - 20 && s.i < L - 1);
+      for (const ch of recentCHOCH.reverse()) {
+        if (ch.dir === 'bull' && candles[L].close > candles[L].open && price < ch.price * 1.005) {
+          return {dir:'long', conf:77, entry:price, sl:price - atr * 1.5, tp1:ch.price, tp2:ch.price + atr * 2, reason:'Bullish CHOCH detected — trend reversal to upside, entering on pullback'};
+        }
+        if (ch.dir === 'bear' && candles[L].close < candles[L].open && price > ch.price * 0.995) {
+          return {dir:'short', conf:77, entry:price, sl:price + atr * 1.5, tp1:ch.price, tp2:ch.price - atr * 2, reason:'Bearish CHOCH detected — trend reversal to downside, entering on pullback'};
+        }
+      }
+      return null;
+    }
+  }
+];
+
+// ═══════════════════════════════════════════════════════════════
+// STRATEGY SCANNER — runs all strategies on all timeframes
+// ═══════════════════════════════════════════════════════════════
+function scanAll(allCandles) {
+  const results = {};
+  for (const tf of TIMEFRAMES) {
+    const candles = allCandles[tf];
+    if (!candles || candles.length < 30) continue;
+    const ind = Ind.computeAll(candles);
+    if (!ind) continue;
+    const smc = SMC.analyze(candles);
+    results[tf] = {ind, smc, setups: []};
+    for (const strat of STRATEGIES) {
+      try {
+        const setup = strat.detect(ind, candles, smc);
+        if (setup) results[tf].setups.push({...setup, stratId: strat.id, stratName: strat.name, tf});
+      } catch {}
+    }
+  }
+  return results;
+}
+
+function getBestSetups(scanResults, maxSetups = 5) {
+  const all = [];
+  for (const tf of TIMEFRAMES) {
+    if (scanResults[tf]?.setups) {
+      for (const s of scanResults[tf].setups) all.push({...s, weight: TF_WEIGHTS[tf] || 1});
+    }
+  }
+  // Score by confidence * TF weight, deduplicate by strategy
+  all.sort((a, b) => (b.conf * b.weight) - (a.conf * a.weight));
+  const seen = new Set();
+  const best = [];
+  for (const s of all) {
+    if (seen.has(s.stratId)) continue;
+    seen.add(s.stratId);
+    best.push(s);
+    if (best.length >= maxSetups) break;
+  }
+  return best;
+}
+
+function getScalpChecklist(scanResults, livePrice) {
+  const checks = [];
+  // 1. Clear trend on 15m+
+  const h1Ind = scanResults['1h']?.ind;
+  const trend15 = scanResults['15m']?.ind;
+  const hasTrend = (h1Ind?.ema9[h1Ind.ema9.length-1] && h1Ind?.ema21[h1Ind.ema21.length-1] && Math.abs(h1Ind.ema9[h1Ind.ema9.length-1] - h1Ind.ema21[h1Ind.ema21.length-1]) / h1Ind.ema21[h1Ind.ema21.length-1] > 0.001);
+  checks.push({label:'Clear trend on 1H', pass: !!hasTrend});
+  // 2. Price at key level
+  const v5 = scanResults['5m']?.ind;
+  const atLevel = v5 && v5.vwap[v5.vwap.length-1] && Math.abs(livePrice - v5.vwap[v5.vwap.length-1]) / livePrice < 0.003;
+  checks.push({label:'Price near key level (VWAP/EMA)', pass: !!atLevel});
+  // 3. Multiple strategy confluence
+  const totalSetups = Object.values(scanResults).reduce((s, r) => s + (r.setups?.length || 0), 0);
+  checks.push({label:'Multiple strategies aligned (2+)', pass: totalSetups >= 2});
+  // 4. Session timing
+  const utcH = new Date().getUTCHours();
+  const goodSession = (utcH >= 7 && utcH <= 11) || (utcH >= 13 && utcH <= 17);
+  checks.push({label:'Active session (London/NY)', pass: goodSession});
+  // 5. Momentum confirming
+  const rsi5 = v5?.rsi[v5.rsi.length-1];
+  const momentumOk = rsi5 && rsi5 > 25 && rsi5 < 75;
+  checks.push({label:'RSI not extreme (25-75)', pass: !!momentumOk});
+  // 6. Volume present
+  const vol5 = scanResults['5m']?.ind;
+  checks.push({label:'Volume present on recent candles', pass: true}); // simplified
+  // 7. ADX trending
+  const adx5 = v5?.adx.adx;
+  const adxVal = adx5 && adx5[adx5.length-1];
+  checks.push({label:'ADX > 20 (trending market)', pass: adxVal > 20});
+  return checks;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SESSIONS & TIMERS
+// ═══════════════════════════════════════════════════════════════
+const SESSIONS = [
+  {name:'Asia', openH:0, openM:0, closeH:9, closeM:0, color:'#f59e0b'},
+  {name:'London', openH:7, openM:0, closeH:16, closeM:0, color:'#3b82f6'},
+  {name:'NY', openH:13, openM:0, closeH:22, closeM:0, color:'#22c55e'},
+];
+function getSessionInfo(s) {
+  const now = new Date();
+  const utcH = now.getUTCHours(), utcM = now.getUTCMinutes(), utcS = now.getUTCSeconds();
+  const nowMins = utcH * 60 + utcM;
+  const openMins = s.openH * 60 + s.openM;
+  const closeMins = s.closeH * 60 + s.closeM;
+  const isOpen = openMins < closeMins ? (nowMins >= openMins && nowMins < closeMins) : (nowMins >= openMins || nowMins < closeMins);
+  let targetMins = isOpen ? closeMins : openMins;
+  let diff = targetMins - nowMins;
+  if (diff < 0) diff += 1440;
+  const totalSec = diff * 60 - utcS;
+  const h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), sec = totalSec % 60;
+  return {isOpen, label: isOpen ? 'Closes' : 'Opens', timer: `${h}h ${m}m ${sec < 10 ? '0' : ''}${sec}s`};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOOLTIP DEFINITIONS
+// ═══════════════════════════════════════════════════════════════
+const TIPS = {
+  vwap: 'Volume Weighted Average Price — the average price weighted by volume. Institutional benchmark. Acts as dynamic support/resistance.',
+  ema9: 'Exponential Moving Average (9 period) — fast-moving average that reacts quickly to price changes. Shows immediate momentum direction.',
+  ema21: 'EMA (21 period) — medium-term trend. When price is above, trend is bullish on this timeframe.',
+  ema50: 'EMA (50 period) — acts as dynamic support/resistance. Often the "line in the sand" for intraday trend.',
+  rsi: 'Relative Strength Index — measures momentum on a 0-100 scale. Above 70 = overbought, below 30 = oversold.',
+  macd: 'Moving Average Convergence/Divergence — shows trend momentum. Histogram reversal = early momentum shift.',
+  bb: 'Bollinger Bands — volatility envelope around a 20 SMA. Squeeze = low volatility about to expand. Walks the band = strong trend.',
+  stochRsi: 'Stochastic RSI — RSI of RSI. More sensitive than regular RSI. Best for catching short-term overbought/oversold.',
+  atr: 'Average True Range — measures volatility in absolute price terms. Used for stop loss and take profit sizing.',
+  adx: 'Average Directional Index — measures trend strength (not direction). Above 25 = trending, below 20 = ranging.',
+  obv: 'On Balance Volume — cumulative volume that shows whether volume flows with or against price. Divergence = early warning.',
+  orderBlock: 'Order Block — the last opposing candle before a significant move. Represents institutional order placement zones.',
+  fvg: 'Fair Value Gap — a 3-candle imbalance where wicks don\'t overlap. Price tends to return to fill these gaps.',
+  bos: 'Break of Structure — when price breaks a previous swing high/low, confirming trend continuation.',
+  choch: 'Change of Character — the FIRST break against the current trend structure. Early reversal signal.',
+  killZone: 'Kill Zone — the opening period of major sessions (London 7-8 UTC, NY 13-14 UTC) when institutional volume enters.',
+  confluence: 'Multiple independent signals agreeing on the same direction. More confluence = higher probability.',
+  rr: 'Risk:Reward ratio — the potential gain divided by the potential loss. Scalping minimum: 1.5:1.',
+  scalping: 'Scalping — taking small, quick profits from short-term price movements. Typical hold: 1-30 minutes.',
+};
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Tooltip Portal
+// ═══════════════════════════════════════════════════════════════
+function Tip({id, children}) {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState(null);
+  const ref = useRef();
+  const text = TIPS[id] || id;
+  const handleEnter = useCallback(() => {
+    if (!ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    const above = r.top > 200;
+    let left = r.left + r.width / 2 - 140;
+    left = Math.max(8, Math.min(left, window.innerWidth - 288));
+    const arrow = r.left + r.width / 2 - left;
+    setPos({top: above ? r.top - 8 : r.bottom + 8, left, above, arrow});
+    setShow(true);
+  }, []);
+  if (!text) return children || null;
+  return React.createElement(React.Fragment, null,
+    React.createElement('span', {ref, className:'info-tip', onMouseEnter:handleEnter, onMouseLeave:() => setShow(false), onTouchStart:handleEnter, onTouchEnd:() => setTimeout(() => setShow(false), 2000)}, '?'),
+    show && pos && ReactDOM.createPortal(
+      React.createElement('div', {className:`info-bubble-fixed ${pos.above ? 'above' : 'below'}`, style:{top:pos.above ? 'auto' : pos.top, bottom:pos.above ? window.innerHeight - pos.top : 'auto', left:pos.left, '--arrow':pos.arrow + 'px'}}, text),
+      document.body
+    )
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Header
+// ═══════════════════════════════════════════════════════════════
+function Header({ticker, livePrice}) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const price = livePrice || (ticker ? +ticker.lastPrice : 0);
+  const change = ticker ? +ticker.priceChangePercent : 0;
+  return (
+    <div className="header">
+      <h1 style={{fontFamily:'Outfit',fontSize:'20px',fontWeight:700,letterSpacing:'-0.5px',marginRight:6}}>
+        <span style={{color:'var(--warn)'}}>BTC</span> Scalp Lab
+      </h1>
+      {price > 0 && <span style={{fontFamily:'JetBrains Mono',fontSize:18,fontWeight:700,color:'var(--text)'}}>${price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>}
+      {ticker && <span className={`badge ${change >= 0 ? 'badge-bull' : 'badge-bear'}`}>{change >= 0 ? '+' : ''}{change.toFixed(2)}%</span>}
+      <div style={{display:'flex',gap:6,marginLeft:'auto',flexWrap:'wrap'}}>
+        {SESSIONS.map(s => {
+          const info = getSessionInfo(s);
+          return (
+            <div key={s.name} className="session-pill">
+              <span className="session-dot" style={{background:s.color, boxShadow:info.isOpen ? `0 0 6px ${s.color}` : 'none', animation:info.isOpen ? 'pulse 1.5s infinite' : 'none'}} />
+              <span className="s-name">{s.name}</span>
+              <span className="s-timer">{info.label} {info.timer}</span>
+            </div>
+          );
+        })}
+      </div>
+      <a href="index.html" style={{color:'var(--accent)',fontSize:12,textDecoration:'none',marginLeft:8}}>Signal Desk →</a>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Scalp Chart
+// ═══════════════════════════════════════════════════════════════
+function ScalpChart({candles, scanResults, selectedTF, onTFChange}) {
+  const containerRef = useRef();
+  const chartRef = useRef();
+  const seriesRef = useRef({});
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    if (chartRef.current) { chartRef.current.remove(); chartRef.current = null; }
+    const chart = LightweightCharts.createChart(containerRef.current, {
+      width: containerRef.current.clientWidth,
+      height: 400,
+      layout:{background:{color:'#0a0e17'},textColor:'#94a3b8',fontSize:11,fontFamily:'JetBrains Mono'},
+      grid:{vertLines:{color:'#1e293b33'},horzLines:{color:'#1e293b33'}},
+      crosshair:{mode:0},
+      rightPriceScale:{borderColor:'#1e293b'},
+      timeScale:{borderColor:'#1e293b',timeVisible:true,secondsVisible:false},
+    });
+    chartRef.current = chart;
+    const cs = chart.addCandlestickSeries({upColor:'#22c55e',downColor:'#ef4444',borderUpColor:'#22c55e',borderDownColor:'#ef4444',wickUpColor:'#22c55e88',wickDownColor:'#ef444488'});
+    const ema9s = chart.addLineSeries({color:'#facc15',lineWidth:1,title:'EMA9'});
+    const ema21s = chart.addLineSeries({color:'#22d3ee',lineWidth:1,title:'EMA21'});
+    const vwapS = chart.addLineSeries({color:'#a855f7',lineWidth:2,lineStyle:2,title:'VWAP'});
+    const volS = chart.addHistogramSeries({color:'#3b82f644',priceFormat:{type:'volume'},priceScaleId:'vol'});
+    chart.priceScale('vol').applyOptions({scaleMargins:{top:0.85,bottom:0}});
+    seriesRef.current = {cs, ema9s, ema21s, vwapS, volS};
+    const ro = new ResizeObserver(entries => { chart.applyOptions({width:entries[0].contentRect.width}); });
+    ro.observe(containerRef.current);
+    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const data = candles?.[selectedTF];
+    const ind = scanResults?.[selectedTF]?.ind;
+    if (!data || !ind || !seriesRef.current.cs) return;
+    const fmt = data.map(c => ({time:c.time / 1000, open:c.open, high:c.high, low:c.low, close:c.close}));
+    seriesRef.current.cs.setData(fmt);
+    seriesRef.current.ema9s.setData(fmt.map((c, i) => ({time:c.time, value:ind.ema9[i]})).filter(d => d.value));
+    seriesRef.current.ema21s.setData(fmt.map((c, i) => ({time:c.time, value:ind.ema21[i]})).filter(d => d.value));
+    seriesRef.current.vwapS.setData(fmt.map((c, i) => ({time:c.time, value:ind.vwap[i]})).filter(d => d.value));
+    seriesRef.current.volS.setData(fmt.map((c, i) => ({time:c.time, value:data[i].volume, color:data[i].close >= data[i].open ? '#22c55e44' : '#ef444444'})));
+    // Add BOS/CHOCH markers
+    const smc = scanResults[selectedTF]?.smc;
+    if (smc?.signals) {
+      const markers = smc.signals.filter(s => s.i < data.length).map(s => ({
+        time: data[s.i].time / 1000,
+        position: s.dir === 'bull' ? 'belowBar' : 'aboveBar',
+        color: s.dir === 'bull' ? '#22c55e' : '#ef4444',
+        shape: s.type === 'BOS' ? 'arrowUp' : 'circle',
+        text: s.type,
+      }));
+      seriesRef.current.cs.setMarkers(markers.slice(-20));
+    }
+    if (chartRef.current) chartRef.current.timeScale().fitContent();
+  }, [candles, scanResults, selectedTF]);
+
+  return (
+    <div className="card m-chart">
+      <div className="card-head">
+        <span>Scalp Chart</span>
+        <div className="tabs" style={{margin:0,padding:2,background:'transparent'}}>
+          {TIMEFRAMES.map(tf => (
+            <div key={tf} className={`tab ${tf === selectedTF ? 'active' : ''}`} style={{padding:'4px 10px',fontSize:12}} onClick={() => onTFChange(tf)}>{TF_LABELS[tf]}</div>
+          ))}
+        </div>
+      </div>
+      <div ref={containerRef} style={{width:'100%',height:400,background:'var(--bg)'}} />
+      <div style={{padding:'4px 12px 6px',display:'flex',gap:12,flexWrap:'wrap',fontSize:11}}>
+        <span><span style={{color:'#facc15'}}>—</span> EMA 9</span>
+        <span><span style={{color:'#22d3ee'}}>—</span> EMA 21</span>
+        <span><span style={{color:'#a855f7'}}>- -</span> VWAP</span>
+        <span><span style={{color:'#22c55e'}}>▲</span> BOS</span>
+        <span><span style={{color:'#ef4444'}}>●</span> CHOCH</span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Strategy Scanner Grid
+// ═══════════════════════════════════════════════════════════════
+function StrategyScannerGrid({scanResults}) {
+  return (
+    <div className="card m-scanner">
+      <div className="card-head"><span>Strategy Scanner</span><Tip id="confluence" /></div>
+      <div className="card-body" style={{padding:0}}>
+        <div className="scanner-grid">
+          <div className="scanner-label" style={{fontWeight:600,color:'var(--muted)',fontSize:11}}>STRATEGY</div>
+          {TIMEFRAMES.map(tf => <div key={tf} className="scanner-cell" style={{fontWeight:600,color:'var(--muted)',fontSize:11}}>{TF_LABELS[tf]}</div>)}
+          {STRATEGIES.map(strat => (
+            <React.Fragment key={strat.id}>
+              <div className="scanner-label">{strat.name}</div>
+              {TIMEFRAMES.map(tf => {
+                const setup = scanResults[tf]?.setups?.find(s => s.stratId === strat.id);
+                return (
+                  <div key={tf} className="scanner-cell">
+                    {setup ? (
+                      <span className="scanner-dot" style={{background: setup.dir === 'long' ? 'var(--bull)' : 'var(--bear)', boxShadow: `0 0 6px ${setup.dir === 'long' ? 'var(--bull)' : 'var(--bear)'}`}} title={`${setup.dir.toUpperCase()} — ${setup.conf}% confidence`} />
+                    ) : (
+                      <span className="scanner-dot" style={{background:'var(--border)'}} />
+                    )}
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Active Scalp Setups
+// ═══════════════════════════════════════════════════════════════
+function ActiveScalpSetups({setups, tradeCapital, riskAmt, userLev}) {
+  if (!setups || setups.length === 0) return (
+    <div className="card m-setups">
+      <div className="card-head"><span>Active Scalp Setups</span></div>
+      <div className="card-body"><div style={{textAlign:'center',color:'var(--muted)',padding:20}}>No active setups detected. Waiting for signals...</div></div>
+    </div>
+  );
+  return (
+    <div className="card m-setups">
+      <div className="card-head"><span>Active Scalp Setups ({setups.length})</span></div>
+      <div className="card-body" style={{display:'flex',flexDirection:'column',gap:10}}>
+        {setups.map((s, i) => {
+          const isLong = s.dir === 'long';
+          const lev = Math.max(1, userLev);
+          const posSizeUSD = tradeCapital * lev;
+          const posSizeBTC = posSizeUSD / s.entry;
+          const slPct = Math.abs(s.entry - s.sl) / s.entry * 100;
+          const tp1Pct = Math.abs(s.tp1 - s.entry) / s.entry * 100;
+          const tp2Pct = Math.abs(s.tp2 - s.entry) / s.entry * 100;
+          const slLoss = posSizeBTC * Math.abs(s.entry - s.sl);
+          const tp1Gain = posSizeBTC * Math.abs(s.tp1 - s.entry);
+          const tp2Gain = posSizeBTC * Math.abs(s.tp2 - s.entry);
+          const rr1 = slPct > 0 ? (tp1Pct / slPct).toFixed(1) : '-';
+          const rr2 = slPct > 0 ? (tp2Pct / slPct).toFixed(1) : '-';
+          return (
+            <div key={i} className={`card ${isLong ? 'glow-bull' : 'glow-bear'} fade-in`} style={{background:'var(--card2)'}}>
+              <div style={{padding:'10px 14px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                  <span className={`badge ${isLong ? 'badge-bull' : 'badge-bear'}`}>{s.dir.toUpperCase()}</span>
+                  <span style={{color:'var(--text)',fontWeight:600,fontSize:14}}>{s.stratName}</span>
+                  <span className="badge badge-neutral" style={{fontSize:10}}>{s.tf}</span>
+                  <span style={{marginLeft:'auto',color:'var(--muted)',fontSize:11}}>Confidence: {s.conf}%</span>
+                </div>
+                <div className="meter-bar" style={{marginBottom:10}}>
+                  <div className="meter-fill" style={{width:`${s.conf}%`, background:isLong ? 'var(--bull)' : 'var(--bear)'}} />
+                </div>
+                <div style={{fontSize:12,color:'var(--dim)',marginBottom:10,lineHeight:1.5}}>{s.reason}</div>
+                <table>
+                  <thead><tr><th>Level</th><th>Price</th><th>%</th><th>$ P&L</th><th>R:R</th></tr></thead>
+                  <tbody>
+                    <tr><td className="text">Entry</td><td className="text">${s.entry.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td>—</td><td>—</td><td>—</td></tr>
+                    <tr className="bear-bg"><td className="bear">Stop Loss</td><td className="bear">${s.sl.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td className="bear">{slPct.toFixed(2)}%</td><td className="bear">-${slLoss.toFixed(2)}</td><td className="bear">—</td></tr>
+                    <tr className="bull-bg"><td className="bull">TP1</td><td className="bull">${s.tp1.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td className="bull">{tp1Pct.toFixed(2)}%</td><td className="bull">+${tp1Gain.toFixed(2)}</td><td className="bull">{rr1}:1</td></tr>
+                    <tr className="bull-bg"><td className="bull">TP2</td><td className="bull">${s.tp2.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</td><td className="bull">{tp2Pct.toFixed(2)}%</td><td className="bull">+${tp2Gain.toFixed(2)}</td><td className="bull">{rr2}:1</td></tr>
+                  </tbody>
+                </table>
+                {slPct > 0 && <div className="rr-bar" style={{marginTop:8}}>
+                  <div className="rr-sl" style={{width:`${100 / (1 + tp1Pct/slPct)}%`}}>SL {slPct.toFixed(1)}%</div>
+                  <div className="rr-tp" style={{flex:1}}>TP1 {tp1Pct.toFixed(1)}%</div>
+                </div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Position Sizer
+// ═══════════════════════════════════════════════════════════════
+function PositionSizer({tradeCapital, setTradeCapital, riskAmt, setRiskAmt, userLev, setUserLev}) {
+  const levOptions = [1, 3, 5, 10];
+  return (
+    <div className="card m-sizer">
+      <div className="card-head"><span>Position Sizer</span><Tip id="rr" /></div>
+      <div className="card-body">
+        <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:10,alignItems:'center'}}>
+          <label style={{fontSize:12,color:'var(--muted)'}}>Trade Capital $<br/>
+            <input className="input" type="number" value={tradeCapital} onChange={e => setTradeCapital(Math.max(0,+e.target.value))} />
+          </label>
+          <label style={{fontSize:12,color:'var(--muted)'}}>Max Loss at SL $<br/>
+            <input className="input" type="number" value={riskAmt} onChange={e => setRiskAmt(Math.max(0,+e.target.value))} />
+          </label>
+        </div>
+        <div className="sub-h">Leverage</div>
+        <div style={{display:'flex',gap:6,marginBottom:10}}>
+          {levOptions.map(lv => (
+            <button key={lv} className={`btn ${lv === userLev ? 'btn-accent' : ''}`} onClick={() => setUserLev(lv)}>{lv}x</button>
+          ))}
+        </div>
+        <table>
+          <thead><tr><th>Leverage</th><th>Position</th><th>Risk %</th><th>Liq Price</th></tr></thead>
+          <tbody>
+            {levOptions.map(lv => {
+              const pos = tradeCapital * lv;
+              const riskPct = pos > 0 ? (riskAmt / pos * 100) : 0;
+              const liqPct = lv > 1 ? (1 / lv * 100).toFixed(1) : '—';
+              return (
+                <tr key={lv} style={{background: lv === userLev ? 'var(--accent-bg)' : 'transparent'}}>
+                  <td className={lv === userLev ? 'accent' : 'text'}>{lv}x</td>
+                  <td>${pos.toLocaleString()}</td>
+                  <td>{riskPct.toFixed(2)}%</td>
+                  <td>{liqPct}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div style={{fontSize:11,color:'var(--muted)',marginTop:8}}>
+          Position = Capital x Leverage. SL adjusts automatically: higher leverage = tighter stop for same risk.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Scalp Checklist
+// ═══════════════════════════════════════════════════════════════
+function ScalpChecklist({checks}) {
+  const passed = checks.filter(c => c.pass).length;
+  const total = checks.length;
+  return (
+    <div className="card m-risk">
+      <div className="card-head"><span>Pre-Trade Checklist ({passed}/{total})</span></div>
+      <div className="card-body">
+        {checks.map((c, i) => (
+          <div key={i} className="check-item">
+            <div className={`check-icon ${c.pass ? 'check-pass' : 'check-fail'}`}>{c.pass ? '\u2713' : '\u2717'}</div>
+            <span style={{color: c.pass ? 'var(--text)' : 'var(--muted)'}}>{c.label}</span>
+          </div>
+        ))}
+        <div style={{marginTop:10,padding:8,borderRadius:6,background: passed >= 5 ? 'var(--bull-bg)' : passed >= 3 ? 'var(--warn-bg)' : 'var(--bear-bg)',fontSize:12,fontWeight:600}}>
+          {passed >= 5 ? <span className="bull">GO — High probability setup environment</span> :
+           passed >= 3 ? <span className="warn">CAUTION — Some conditions not met, reduce size</span> :
+           <span className="bear">WAIT — Conditions not favorable for scalping</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Strategy Playbook (Education)
+// ═══════════════════════════════════════════════════════════════
+function StrategyPlaybook({scanResults}) {
+  const [openId, setOpenId] = useState(null);
+  const [filterCat, setFilterCat] = useState('All');
+  const cats = ['All', 'Indicator', 'SMC', 'Session', 'Price Action'];
+  const filtered = filterCat === 'All' ? STRATEGIES : STRATEGIES.filter(s => s.category === filterCat);
+  const diffLabel = d => d === 1 ? 'Beginner' : d === 2 ? 'Intermediate' : 'Advanced';
+  return (
+    <div className="card m-playbook bottom-panel">
+      <div className="card-head"><span>Scalp Strategy Playbook ({STRATEGIES.length} Strategies)</span><Tip id="scalping" /></div>
+      <div className="card-body">
+        <div style={{marginBottom:12,padding:12,background:'var(--accent-bg)',borderRadius:8,border:'1px solid var(--accent-dim)',fontSize:13,lineHeight:1.6}}>
+          <strong style={{color:'var(--accent)'}}>Welcome to Scalp Lab.</strong> This playbook covers {STRATEGIES.length} proven scalp strategies across 4 categories. Each strategy includes a detailed explanation, exact entry/exit rules, pro tips, and common mistakes. Click any strategy to expand its full guide. The Strategy Scanner above shows which strategies are currently active in real-time.
+        </div>
+        <div className="tabs" style={{marginBottom:10}}>
+          {cats.map(c => <div key={c} className={`tab ${c === filterCat ? 'active' : ''}`} onClick={() => setFilterCat(c)}>{c}</div>)}
+        </div>
+        {filtered.map(strat => {
+          const isOpen = openId === strat.id;
+          // Check if this strategy is currently active
+          const activeCount = Object.values(scanResults).reduce((n, r) => n + (r.setups?.some(s => s.stratId === strat.id) ? 1 : 0), 0);
+          return (
+            <div key={strat.id} className="strat-card">
+              <div className="strat-head" onClick={() => setOpenId(isOpen ? null : strat.id)}>
+                <span style={{color:'var(--text)',fontWeight:600,fontSize:14,flex:1}}>{strat.name}</span>
+                <span className={`strat-tag diff-${strat.difficulty}`}>{diffLabel(strat.difficulty)}</span>
+                <span className="badge badge-neutral" style={{fontSize:10,marginLeft:4}}>{strat.category}</span>
+                {activeCount > 0 && <span className="badge badge-bull" style={{fontSize:10,marginLeft:4}}>LIVE ({activeCount})</span>}
+                <span style={{color:'var(--muted)',fontSize:16,marginLeft:8}}>{isOpen ? '\u25B2' : '\u25BC'}</span>
+              </div>
+              <div className={`strat-body ${isOpen ? 'open' : ''}`}>
+                <div style={{display:'flex',gap:12,marginBottom:10,fontSize:11,color:'var(--muted)',flexWrap:'wrap'}}>
+                  <span>Best TF: <strong style={{color:'var(--text)'}}>{strat.bestTF}</strong></span>
+                  <span>Best Session: <strong style={{color:'var(--text)'}}>{strat.bestSession}</strong></span>
+                </div>
+
+                <div className="sub-h">What Is It?</div>
+                <p style={{fontSize:13,lineHeight:1.7,marginBottom:12,color:'var(--dim)'}}>{strat.overview}</p>
+
+                <div className="sub-h">How It Works</div>
+                <p style={{fontSize:13,lineHeight:1.7,marginBottom:12,color:'var(--dim)'}}>{strat.howItWorks}</p>
+
+                <div className="sub-h">Entry Rules</div>
+                <ol style={{paddingLeft:20,marginBottom:12}}>
+                  {strat.entryRules.map((r, i) => <li key={i} style={{fontSize:13,lineHeight:1.7,color:'var(--text)',marginBottom:4}}>{r}</li>)}
+                </ol>
+
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+                  <div style={{background:'var(--bear-bg)',borderRadius:6,padding:10,border:'1px solid var(--bear-dim)'}}>
+                    <div style={{fontWeight:600,fontSize:12,color:'var(--bear)',marginBottom:4}}>STOP LOSS</div>
+                    <div style={{fontSize:12,color:'var(--dim)',lineHeight:1.6}}>{strat.slRule}</div>
+                  </div>
+                  <div style={{background:'var(--bull-bg)',borderRadius:6,padding:10,border:'1px solid var(--bull-dim)'}}>
+                    <div style={{fontWeight:600,fontSize:12,color:'var(--bull)',marginBottom:4}}>TAKE PROFIT</div>
+                    <div style={{fontSize:12,color:'var(--dim)',lineHeight:1.6}}>{strat.tpRule}</div>
+                  </div>
+                </div>
+
+                <div className="sub-h">Pro Tips</div>
+                <ul style={{paddingLeft:18,marginBottom:12}}>
+                  {strat.tips.map((t, i) => <li key={i} style={{fontSize:12,lineHeight:1.7,color:'var(--bull)',marginBottom:3}}>{t}</li>)}
+                </ul>
+
+                <div className="sub-h">Common Mistakes</div>
+                <ul style={{paddingLeft:18,marginBottom:6}}>
+                  {strat.mistakes.map((m, i) => <li key={i} style={{fontSize:12,lineHeight:1.7,color:'var(--bear)',marginBottom:3}}>{m}</li>)}
+                </ul>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Risk Management Guide
+// ═══════════════════════════════════════════════════════════════
+function RiskGuide() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card m-risk">
+      <div className="card-head" onClick={() => setOpen(!open)}>
+        <span>Scalp Risk Management Guide</span>
+        <span style={{color:'var(--muted)',fontSize:14}}>{open ? '\u25B2' : '\u25BC'}</span>
+      </div>
+      {open && <div className="card-body fade-in">
+        <div className="sub-h">The 7 Rules of Scalp Risk Management</div>
+        <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:8}}>
+          {[
+            {title:'1. Risk 1-2% Maximum Per Trade', desc:'Never risk more than 1-2% of your total account on a single scalp. With a $10,000 account, max risk per trade is $100-200. This ensures you survive losing streaks (which WILL happen).', color:'var(--accent)'},
+            {title:'2. Set a Daily Loss Limit (3-5%)', desc:'If you lose 3-5% of your account in a single session, STOP TRADING. This prevents tilt trading and revenge trading. Walk away, reset mentally, come back tomorrow.', color:'var(--bear)'},
+            {title:'3. Minimum 1.5:1 Risk-Reward', desc:'Your take profit should be at least 1.5x your stop loss distance. This means you only need to be right 40% of the time to be profitable. NEVER take a scalp with less than 1:1 R:R.', color:'var(--bull)'},
+            {title:'4. Maximum 3-5 Trades Per Session', desc:'Quality over quantity. Taking too many trades leads to overtrading, higher fees, and emotional fatigue. Wait for A+ setups only.', color:'var(--warn)'},
+            {title:'5. Use Hard Stop Losses — ALWAYS', desc:'Never "mental stop" a scalp. Set your stop loss order immediately when entering. The market will not respect your mental promises. One bad trade without a stop can erase a week of profits.', color:'var(--bear)'},
+            {title:'6. Adjust Leverage to Your Risk', desc:'Higher leverage = tighter stop loss for the same risk amount. Use the Position Sizer above to find the right leverage. Start with 1-3x until you are consistently profitable.', color:'var(--accent)'},
+            {title:'7. Track Every Trade', desc:'Use the Trade Journal on the main Signal Desk to record every scalp: entry, exit, strategy used, what went right, what went wrong. Without data, you cannot improve.', color:'var(--purple)'},
+          ].map((rule, i) => (
+            <div key={i} style={{background:'var(--card2)',borderRadius:6,padding:12,border:'1px solid var(--border)'}}>
+              <div style={{fontWeight:700,fontSize:13,color:rule.color,marginBottom:4}}>{rule.title}</div>
+              <div style={{fontSize:12,color:'var(--dim)',lineHeight:1.6}}>{rule.desc}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="sub-h" style={{marginTop:16}}>Session Timing Guide</div>
+        <table style={{marginTop:6}}>
+          <thead><tr><th>Session</th><th>UTC Time</th><th>Quality</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td className="text">Asia</td><td>00:00 - 09:00</td><td className="warn">Medium</td><td>Lower volume, range-bound. Good for mean reversion.</td></tr>
+            <tr><td className="text">London Open</td><td>07:00 - 09:00</td><td className="bull">Best</td><td>High volume, big moves. Kill zone trades excel here.</td></tr>
+            <tr><td className="text">London</td><td>09:00 - 12:00</td><td className="bull">Good</td><td>Continuation of London open moves. Trend following.</td></tr>
+            <tr><td className="text">NY Open</td><td>13:00 - 15:00</td><td className="bull">Best</td><td>Highest volume. Often reverses London direction.</td></tr>
+            <tr><td className="text">NY Afternoon</td><td>15:00 - 18:00</td><td className="warn">Medium</td><td>Volume declining. Take profits, don't start new trades.</td></tr>
+            <tr><td className="text">NY Close</td><td>20:00 - 22:00</td><td className="bear">Low</td><td>Avoid. Low volume, spreads widen, false signals increase.</td></tr>
+          </tbody>
+        </table>
+
+        <div className="sub-h" style={{marginTop:16}}>Scalping Psychology</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:6}}>
+          <div style={{background:'var(--bull-bg)',borderRadius:6,padding:10,border:'1px solid var(--bull-dim)'}}>
+            <div style={{fontWeight:600,fontSize:12,color:'var(--bull)',marginBottom:6}}>DO</div>
+            <ul style={{paddingLeft:16,fontSize:11,lineHeight:1.8,color:'var(--dim)'}}>
+              <li>Wait patiently for setups</li>
+              <li>Accept losses as part of the process</li>
+              <li>Follow your rules mechanically</li>
+              <li>Take breaks between trades</li>
+              <li>Review your journal weekly</li>
+              <li>Scale up slowly when profitable</li>
+            </ul>
+          </div>
+          <div style={{background:'var(--bear-bg)',borderRadius:6,padding:10,border:'1px solid var(--bear-dim)'}}>
+            <div style={{fontWeight:600,fontSize:12,color:'var(--bear)',marginBottom:6}}>DON'T</div>
+            <ul style={{paddingLeft:16,fontSize:11,lineHeight:1.8,color:'var(--dim)'}}>
+              <li>Revenge trade after a loss</li>
+              <li>Move your stop loss further away</li>
+              <li>Overtrade — quality not quantity</li>
+              <li>Trade without a plan</li>
+              <li>Chase price after missing entry</li>
+              <li>Increase size to "make back" losses</li>
+            </ul>
+          </div>
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Quick Reference
+// ═══════════════════════════════════════════════════════════════
+function QuickReference() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card m-ref">
+      <div className="card-head" onClick={() => setOpen(!open)}>
+        <span>Quick Reference Cheat Sheet</span>
+        <span style={{color:'var(--muted)',fontSize:14}}>{open ? '\u25B2' : '\u25BC'}</span>
+      </div>
+      {open && <div className="card-body fade-in">
+        <div className="sub-h">Indicator Quick Reference</div>
+        <table style={{marginBottom:12}}>
+          <thead><tr><th>Indicator</th><th>Bullish Signal</th><th>Bearish Signal</th></tr></thead>
+          <tbody>
+            <tr><td className="text">VWAP</td><td className="bull">Price bounces off VWAP from above</td><td className="bear">Price rejects at VWAP from below</td></tr>
+            <tr><td className="text">EMA 9/21</td><td className="bull">9 crosses above 21</td><td className="bear">9 crosses below 21</td></tr>
+            <tr><td className="text">RSI (14)</td><td className="bull">Rises from below 30, divergence</td><td className="bear">Falls from above 70, divergence</td></tr>
+            <tr><td className="text">MACD</td><td className="bull">Histogram turns positive</td><td className="bear">Histogram turns negative</td></tr>
+            <tr><td className="text">Bollinger</td><td className="bull">Squeeze breaks upward</td><td className="bear">Squeeze breaks downward</td></tr>
+            <tr><td className="text">StochRSI</td><td className="bull">K crosses D below 20</td><td className="bear">K crosses D above 80</td></tr>
+            <tr><td className="text">ADX</td><td className="bull" colSpan={2}>Above 25 = trending (trade with trend). Below 20 = ranging (mean revert)</td></tr>
+          </tbody>
+        </table>
+
+        <div className="sub-h">SMC Quick Reference</div>
+        <table style={{marginBottom:12}}>
+          <thead><tr><th>Concept</th><th>What It Means</th><th>How to Trade It</th></tr></thead>
+          <tbody>
+            <tr><td className="text">Order Block</td><td>Institutional order zone</td><td>Enter on first touch with rejection candle</td></tr>
+            <tr><td className="text">FVG</td><td>Price void / imbalance</td><td>Enter when price fills 50% of the gap</td></tr>
+            <tr><td className="text">BOS</td><td>Trend continuation confirmed</td><td>Enter on pullback after the break</td></tr>
+            <tr><td className="text">CHOCH</td><td>First sign of reversal</td><td>Enter on pullback after the character change</td></tr>
+            <tr><td className="text">Liquidity Sweep</td><td>Stop hunt by smart money</td><td>Enter on rejection candle after the sweep</td></tr>
+          </tbody>
+        </table>
+
+        <div className="sub-h">Entry Checklist (Before Every Trade)</div>
+        <ol style={{paddingLeft:20,fontSize:12,lineHeight:2,color:'var(--dim)'}}>
+          <li>What is the <strong style={{color:'var(--text)'}}>1H trend</strong>? (Only trade with it)</li>
+          <li>Is price at a <strong style={{color:'var(--text)'}}>key level</strong>? (VWAP, EMA, OB, FVG)</li>
+          <li>Do I have <strong style={{color:'var(--text)'}}>2+ confirmations</strong>? (Check scanner)</li>
+          <li>Is this a <strong style={{color:'var(--text)'}}>good session</strong>? (London or NY open)</li>
+          <li>Is my R:R at least <strong style={{color:'var(--text)'}}>1.5:1</strong>?</li>
+          <li>Am I within my <strong style={{color:'var(--text)'}}>daily loss limit</strong>?</li>
+          <li>Do I have a <strong style={{color:'var(--text)'}}>clear invalidation</strong> (stop loss level)?</li>
+        </ol>
+      </div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APP
+// ═══════════════════════════════════════════════════════════════
+function App() {
+  const [status, setStatus] = useState('Initializing...');
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [livePrice, setLivePrice] = useState(null);
+  const [selectedTF, setSelectedTF] = useState('5m');
+  const [tradeCapital, setTradeCapital] = useState(1000);
+  const [riskAmt, setRiskAmt] = useState(100);
+  const [userLev, setUserLev] = useState(1);
+
+  // Fetch data
+  const loadData = useCallback(async () => {
+    try {
+      const result = await DataService.fetchAll(setStatus);
+      setData(result);
+      setError(null);
+      setStatus('Live');
+    } catch (e) {
+      setError(e.message);
+      setStatus('Error');
+    }
+  }, []);
+
+  useEffect(() => { loadData(); const t = setInterval(loadData, REFRESH_MS); return () => clearInterval(t); }, [loadData]);
+
+  // WebSocket for live price
+  useEffect(() => {
+    if (!data) return;
+    let ws, reconnect;
+    const connect = () => {
+      try {
+        ws = new WebSocket(DataService.getWsUrl());
+        ws.onmessage = e => { try { const d = JSON.parse(e.data); setLivePrice(+d.k.c); } catch {} };
+        ws.onclose = () => { reconnect = setTimeout(connect, 3000); };
+        ws.onerror = () => ws.close();
+      } catch {}
+    };
+    connect();
+    return () => { clearTimeout(reconnect); ws?.close(); };
+  }, [data]);
+
+  // Compute scan results
+  const scanResults = useMemo(() => {
+    if (!data?.candles) return {};
+    return scanAll(data.candles);
+  }, [data]);
+
+  const bestSetups = useMemo(() => getBestSetups(scanResults), [scanResults]);
+  const checks = useMemo(() => getScalpChecklist(scanResults, livePrice || (data?.ticker ? +data.ticker.lastPrice : 0)), [scanResults, livePrice, data]);
+
+  if (error) return (
+    <div>
+      <Header ticker={null} livePrice={null} />
+      <div className="error-box">Error: {error}. Retrying in {REFRESH_MS/1000}s...</div>
+    </div>
+  );
+
+  if (!data) return (
+    <div>
+      <Header ticker={null} livePrice={null} />
+      <div className="loading"><div className="pulse" style={{fontSize:24,marginBottom:12}}>Loading BTCUSDT Data...</div><div>{status}</div></div>
+    </div>
+  );
+
+  return (
+    <div>
+      <Header ticker={data.ticker} livePrice={livePrice} />
+      <div className="main-grid">
+        <div className="col-left">
+          <ScalpChart candles={data.candles} scanResults={scanResults} selectedTF={selectedTF} onTFChange={setSelectedTF} />
+          <StrategyScannerGrid scanResults={scanResults} />
+          <StrategyPlaybook scanResults={scanResults} />
+        </div>
+        <div className="col-right">
+          <ActiveScalpSetups setups={bestSetups} tradeCapital={tradeCapital} riskAmt={riskAmt} userLev={userLev} />
+          <PositionSizer tradeCapital={tradeCapital} setTradeCapital={setTradeCapital} riskAmt={riskAmt} setRiskAmt={setRiskAmt} userLev={userLev} setUserLev={setUserLev} />
+          <ScalpChecklist checks={checks} />
+          <RiskGuide />
+          <QuickReference />
+        </div>
+      </div>
+      <div className="footer">
+        BTC Scalp Lab — Real-time scalp trading education & signals. Data from Binance. Refreshes every {REFRESH_MS/1000}s.
+        <br/>Not financial advice. Trade at your own risk. <a href="index.html" style={{color:'var(--accent)'}}>Back to Signal Desk</a>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
