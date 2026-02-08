@@ -1084,14 +1084,33 @@ const TradeGen = {
 // ═══════════════════════════════════════════════════════════════
 // SESSION AWARENESS
 // ═══════════════════════════════════════════════════════════════
-function getActiveSessions() {
-  const h = new Date().getUTCHours();
-  const sessions = [];
-  if (h >= 0 && h < 9) sessions.push({name:'Asia',color:'#f59e0b'});
-  if (h >= 7 && h < 16) sessions.push({name:'London',color:'#3b82f6'});
-  if (h >= 13 && h < 22) sessions.push({name:'New York',color:'#22c55e'});
-  if (!sessions.length) sessions.push({name:'Off-hours',color:'#64748b'});
-  return sessions;
+const SESSIONS = [
+  {name:'Asia',    color:'#f59e0b', openUTC:0,  closeUTC:9 },
+  {name:'London',  color:'#3b82f6', openUTC:7,  closeUTC:16},
+  {name:'New York',color:'#22c55e', openUTC:13, closeUTC:22},
+];
+function getSessionInfo() {
+  const now = new Date();
+  const utcH = now.getUTCHours();
+  const utcM = now.getUTCMinutes();
+  const utcS = now.getUTCSeconds();
+  const nowSecs = utcH * 3600 + utcM * 60 + utcS;
+  return SESSIONS.map(s => {
+    const openSecs = s.openUTC * 3600;
+    const closeSecs = s.closeUTC * 3600;
+    const isOpen = nowSecs >= openSecs && nowSecs < closeSecs;
+    let countdownSecs;
+    if (isOpen) {
+      countdownSecs = closeSecs - nowSecs;
+    } else {
+      countdownSecs = nowSecs < openSecs ? openSecs - nowSecs : (24 * 3600 - nowSecs) + openSecs;
+    }
+    const hrs = Math.floor(countdownSecs / 3600);
+    const mins = Math.floor((countdownSecs % 3600) / 60);
+    const secs = countdownSecs % 60;
+    const countdown = `${hrs}h ${String(mins).padStart(2,'0')}m ${String(secs).padStart(2,'0')}s`;
+    return {...s, isOpen, countdown, label: isOpen ? 'Closes' : 'Opens'};
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1239,7 +1258,12 @@ function Tip({k}) {
 // ═══════════════════════════════════════════════════════════════
 
 // ── Header ──
-function Header({livePrice, change24h, lastRefresh, sessions, onRefresh, status}) {
+function Header({livePrice, change24h, lastRefresh, onRefresh}) {
+  const [sessionInfo, setSessionInfo] = useState(getSessionInfo);
+  useEffect(() => {
+    const id = setInterval(() => setSessionInfo(getSessionInfo()), 1000);
+    return () => clearInterval(id);
+  }, []);
   return (
     <div className="header">
       <h2 style={{fontSize:18,letterSpacing:'-0.5px'}}>BTC Signal Desk</h2>
@@ -1253,11 +1277,13 @@ function Header({livePrice, change24h, lastRefresh, sessions, onRefresh, status}
           {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
         </span>
       )}
-      <div style={{display:'flex',gap:6,alignItems:'center',marginLeft:8}}>
-        {sessions.map(s => (
-          <span key={s.name} style={{fontSize:10,color:s.color,display:'flex',alignItems:'center',gap:3}}>
-            <span className="session-dot" style={{background:s.color}}></span>{s.name}
-          </span>
+      <div style={{display:'flex',gap:10,alignItems:'center',marginLeft:8,flexWrap:'wrap'}}>
+        {sessionInfo.map(s => (
+          <div key={s.name} style={{display:'flex',alignItems:'center',gap:4,fontSize:10}}>
+            <span className="session-dot" style={{background: s.isOpen ? s.color : 'var(--border2)', boxShadow: s.isOpen ? `0 0 6px ${s.color}` : 'none'}}></span>
+            <span style={{color: s.isOpen ? s.color : 'var(--muted)', fontWeight: s.isOpen ? 600 : 400}}>{s.name}</span>
+            <span style={{color:'var(--muted)',fontSize:9,fontFamily:'JetBrains Mono'}}>{s.label} {s.countdown}</span>
+          </div>
         ))}
       </div>
       <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,fontSize:11,color:'var(--muted)'}}>
@@ -2590,8 +2616,6 @@ function App() {
   const prevSetupRef = useRef(null);
   const prevCompositeRef = useRef(null);
   const [setupChanges, setSetupChanges] = useState([]);
-  const sessions = useMemo(getActiveSessions, [lastRefresh]);
-
   const detectChanges = (oldSetup, newSetup, oldComp, newComp) => {
     const changes = [];
     const ts = new Date().toLocaleTimeString();
@@ -2683,14 +2707,14 @@ function App() {
 
   if (loading) return (
     <div>
-      <Header livePrice={null} change24h={null} lastRefresh={null} sessions={getActiveSessions()} onRefresh={refresh} />
+      <Header livePrice={null} change24h={null} lastRefresh={null} onRefresh={refresh} />
       <div className="loading pulse" style={{marginTop:60}}>{status}</div>
     </div>
   );
 
   return (
     <div>
-      <Header livePrice={livePrice} change24h={change24h} lastRefresh={lastRefresh} sessions={sessions} onRefresh={refresh} />
+      <Header livePrice={livePrice} change24h={change24h} lastRefresh={lastRefresh} onRefresh={refresh} />
       {error && <div className="error-box">{error}</div>}
 
       <div className="main-grid">
