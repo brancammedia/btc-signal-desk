@@ -792,25 +792,20 @@ const TradeGen = {
     // Weighted avg entry
     const weightedEntry = ladder.reduce((s,l) => s + l.price * l.pct, 0) / 100;
 
-    // ── STOP LOSS ──
-    let sl;
+    // ── TECHNICAL STOP LOSS (recommended by indicators) ──
+    let techSl;
     if (isLong) {
       const candidates = [entry - 1.5 * atr];
-      // Below nearest swing low
       const swLow = smc4h?.swings?.lows?.slice(-3).map(l => l.price).filter(p => p < entry);
       if (swLow?.length) candidates.push(Math.max(...swLow) - atr * 0.1);
-      // Below OB
       const ob = smc4h?.obs?.find(o => o.type === 'bullish' && o.low < entry);
       if (ob) candidates.push(ob.low - atr * 0.1);
-      // Below cloud
       if (tf4h.ichimoku.cloudBot && tf4h.ichimoku.cloudBot < entry) candidates.push(tf4h.ichimoku.cloudBot - atr * 0.1);
-      // Below BB lower
       if (tf4h.bb.squeeze && tf4h.bb.lower) candidates.push(tf4h.bb.lower);
-      sl = Math.max(...candidates); // most conservative = highest SL for long
-      // Clamp: min 0.5%, max 5%
+      techSl = Math.max(...candidates);
       const minSl = entry * 0.995, maxSl = entry * 0.95;
-      sl = Math.min(sl, minSl);
-      sl = Math.max(sl, maxSl);
+      techSl = Math.min(techSl, minSl);
+      techSl = Math.max(techSl, maxSl);
     } else {
       const candidates = [entry + 1.5 * atr];
       const swHigh = smc4h?.swings?.highs?.slice(-3).map(h => h.price).filter(p => p > entry);
@@ -819,23 +814,40 @@ const TradeGen = {
       if (ob) candidates.push(ob.high + atr * 0.1);
       if (tf4h.ichimoku.cloudTop && tf4h.ichimoku.cloudTop > entry) candidates.push(tf4h.ichimoku.cloudTop + atr * 0.1);
       if (tf4h.bb.squeeze && tf4h.bb.upper) candidates.push(tf4h.bb.upper);
-      sl = Math.min(...candidates);
+      techSl = Math.min(...candidates);
       const minSl = entry * 1.005, maxSl = entry * 1.05;
-      sl = Math.max(sl, minSl);
-      sl = Math.min(sl, maxSl);
+      techSl = Math.max(techSl, minSl);
+      techSl = Math.min(techSl, maxSl);
     }
+
+    // ── POSITION SIZING ──
+    const atrPct = tf4h.atr.pct || 2;
+    const lev = Math.max(1, userLev);
+    const posSizeUSD = tradeCapital * lev;
+    const posSizeBTC = posSizeUSD / entry;
+
+    // ── RISK-BASED STOP LOSS ──
+    // SL is derived from: maxLoss / position = SL distance %
+    // If riskAmt is 0 or not set, fall back to technical SL
+    let sl;
+    if (riskAmt > 0 && posSizeUSD > 0) {
+      const riskSlPct = riskAmt / posSizeUSD; // e.g. $100 / $10,000 = 1%
+      sl = isLong ? entry * (1 - riskSlPct) : entry * (1 + riskSlPct);
+    } else {
+      sl = techSl;
+    }
+
+    const liqPrice = lev > 1 ? (isLong ? entry * (1 - 1/lev) : entry * (1 + 1/lev)) : 0;
+    const margin = tradeCapital;
 
     // ── TAKE PROFITS ──
     const tps = [];
     if (isLong) {
-      // TP1: nearest resistance or 1.0 fib ext
       const res = smc4h?.sr?.filter(l => l.type === 'resistance' && l.price > entry).sort((a,b) => a.price - b.price);
       const fibE1 = tf4h.fibExts?.find(f => f.r === 1);
       tps.push({pct:33, price: Math.min(res?.[0]?.price || entry + 2*atr, fibE1?.p || entry + 2*atr, entry + 2*atr), label:'TP1'});
-      // TP2: 1.618 fib ext
       const fibE2 = tf4h.fibExts?.find(f => f.r === 1.618);
       tps.push({pct:33, price: fibE2?.p || entry + 3.5*atr, label:'TP2'});
-      // TP3: 2.0 fib ext or weekly level
       const fibE3 = tf4h.fibExts?.find(f => f.r === 2);
       tps.push({pct:34, price: fibE3?.p || entry + 5*atr, label:'TP3'});
     } else {
@@ -847,22 +859,14 @@ const TradeGen = {
 
     // ── RISK / REWARD ──
     const slDist = Math.abs(entry - sl);
+    const slPct = slDist / entry;
+    const slLoss = riskAmt > 0 ? riskAmt : posSizeUSD * slPct; // if risk set, loss = risk; else calc from techSl
+    const techSlDist = Math.abs(entry - techSl);
+    const techSlPct = techSlDist / entry * 100;
     const rr1 = slDist > 0 ? Math.abs(tps[0].price - entry) / slDist : 0;
     const rr2 = slDist > 0 ? Math.abs(tps[1].price - entry) / slDist : 0;
     const rr3 = slDist > 0 ? Math.abs(tps[2].price - entry) / slDist : 0;
     const avgRR = (rr1 * 0.33 + rr2 * 0.33 + rr3 * 0.34);
-
-    // ── POSITION SIZING ──
-    // Position = Trade Capital × Leverage
-    // riskAmt = max $ willing to lose at SL (informational cap)
-    const slPct = slDist / entry;
-    const atrPct = tf4h.atr.pct || 2;
-    const lev = Math.max(1, userLev);
-    const posSizeUSD = tradeCapital * lev;
-    const posSizeBTC = posSizeUSD / entry;
-    const slLoss = posSizeUSD * slPct; // actual $ lost if SL hits
-    const liqPrice = lev > 1 ? (isLong ? entry * (1 - 1/lev) : entry * (1 + 1/lev)) : 0;
-    const margin = tradeCapital;
 
     // ── CONFIDENCE ──
     const abScore = Math.abs(composite.score);
@@ -875,7 +879,7 @@ const TradeGen = {
     const summary = this._buildSummary(isLong, direction, allInd, allSmc, composite, tf4h, smc4h, entry, sl, tps, confidence, timing);
 
     return {
-      direction: isLong ? 'LONG' : 'SHORT', entry, sl, tps, slDist, slPct: slPct * 100,
+      direction: isLong ? 'LONG' : 'SHORT', entry, sl, techSl, tps, slDist, slPct: slPct * 100, techSlPct,
       rr: [rr1, rr2, rr3], avgRR, posSizeUSD, posSizeBTC, lev, liqPrice, margin, slLoss,
       tradeCapital, riskAmt, confidence, atrPct, price, timing, summary,
       ladder, weightedEntry, nearbyObvious, frOffset
@@ -1147,7 +1151,8 @@ const TIPS = {
 
   // Trade setup fields
   entry: 'Suggested entry price based on current market structure and signal direction.',
-  stopLoss: 'Maximum risk level. If price hits this, exit the trade to limit losses. Placed beyond key support/resistance using ATR as a buffer.',
+  stopLoss: 'Your stop loss, calculated from your max loss and leverage. Formula: SL = Entry × (1 ± MaxLoss/Position). Higher leverage = tighter stop. The "Technical SL" row shows where indicators suggest the stop should go — if your risk-based SL is tighter, you may get stopped out before the real level.',
+  techSl: 'The stop loss recommended by technical analysis (ATR, swing lows, order blocks, Ichimoku cloud). Compare this to your risk-based SL above. If your SL is much tighter, consider reducing leverage so your stop has room to breathe.',
   tps: 'Three take-profit targets for scaling out: 33% at TP1 (conservative), 33% at TP2 (moderate), 34% at TP3 (aggressive). This locks in profits progressively.',
   riskReward: 'Ratio of potential loss (to stop) vs potential gain (to TP). Higher R:R = better risk-adjusted trade. Aim for at least 2:1.',
   positionSizing: 'Trade Capital = the $ you\'re putting up for this trade. Max Loss at SL = the most you\'re willing to lose. Leverage multiplies your position: $1,000 at 3x = $3,000 position. Use the comparison table to see how each leverage level affects your position, SL loss, TP gains, and liquidation price.',
@@ -1392,10 +1397,18 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, userLev, onCapitalChange,
                 <tr style={{background:'var(--bear-bg)'}}>
                   <td className="bear">Stop Loss <Tip k="stopLoss" /></td>
                   <td className="bear" style={{fontWeight:600}}>{fmtP(setup.sl)}</td>
-                  <td className="bear" style={{textAlign:'right',fontWeight:700}}>{slPnl < 0 ? '-' : '+'}${Math.abs(slPnl).toFixed(2)}</td>
+                  <td className="bear" style={{textAlign:'right',fontWeight:700}}>-${Math.abs(slPnl).toFixed(2)}</td>
                   <td className="bear" style={{textAlign:'right',fontWeight:600,fontSize:11}}>{fmt(slPnl / cap * 100, 1)}%</td>
                   <td className="muted" style={{fontSize:10}}>-{fmt(setup.slPct)}%</td>
                 </tr>
+                {setup.techSl && Math.abs(setup.techSl - setup.sl) > 1 && (
+                  <tr style={{background:'rgba(59,130,246,0.05)'}}>
+                    <td className="muted" style={{fontSize:10,paddingLeft:16}}>Technical SL <Tip k="techSl" /></td>
+                    <td className="muted" style={{fontSize:11}}>{fmtP(setup.techSl)}</td>
+                    <td></td><td></td>
+                    <td className="muted" style={{fontSize:10}}>-{fmt(setup.techSlPct)}%</td>
+                  </tr>
+                )}
                 {setup.tps.map((tp, i) => (
                   <tr key={i} style={{background:'var(--bull-bg)'}}>
                     <td className="bull">{tp.label} ({tp.pct}%){i === 0 && <Tip k="tps" />}</td>
@@ -1434,7 +1447,6 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, userLev, onCapitalChange,
         {(() => {
           const LEV_OPTIONS = [1, 3, 5, 10];
           const slLoss = setup.slLoss || 0;
-          const slExceedsRisk = riskAmt > 0 && slLoss > riskAmt;
           return (<>
             <div className="sub-h">Position Sizing <Tip k="positionSizing" /></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
@@ -1473,13 +1485,16 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, userLev, onCapitalChange,
               </div>
               <div style={{borderTop:'1px solid var(--border)',paddingTop:6,marginTop:6}}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
-                  <span style={{color:'var(--muted)'}}>SL Distance</span>
-                  <span style={{color:'var(--bear)',fontWeight:500}}>{fmtP(setup.slDist)} ({fmt(setup.slPct,2)}%)</span>
+                  <span style={{color:'var(--muted)'}}>Your Stop Loss</span>
+                  <span style={{color:'var(--bear)',fontWeight:600}}>{fmtP(setup.sl)} ({fmt(setup.slPct,2)}%)</span>
                 </div>
-                <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <span style={{color:'var(--muted)'}}>Loss if SL hits</span>
-                  <span style={{color: slExceedsRisk ? 'var(--bear)' : 'var(--warn)', fontWeight:700}}>-{fmtP(slLoss)}</span>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{color:'var(--muted)'}}>Max Loss at SL</span>
+                  <span style={{color:'var(--bear)',fontWeight:700}}>-{fmtP(slLoss)}</span>
                 </div>
+                {riskAmt > 0 && <div style={{color:'var(--muted)',fontSize:10,textAlign:'right'}}>
+                  {fmtP(riskAmt)} / {fmtP(setup.posSizeUSD)} = {fmt(setup.slPct,2)}% from entry
+                </div>}
               </div>
               {setup.lev > 1 && setup.liqPrice > 0 && (
                 <div style={{borderTop:'1px solid var(--border)',paddingTop:6,marginTop:6}}>
@@ -1491,16 +1506,21 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, userLev, onCapitalChange,
               )}
             </div>
 
-            {/* SL vs Risk warning */}
-            {slExceedsRisk && (
-              <div style={{background:'var(--bear-bg)',border:'1px solid var(--bear-dim)',borderRadius:6,padding:'8px 10px',marginBottom:8,fontSize:11,lineHeight:1.5}}>
-                <div style={{color:'var(--bear)',fontWeight:600,marginBottom:3}}>SL loss exceeds your max risk</div>
-                <div style={{color:'var(--dim)'}}>
-                  At {setup.lev}x leverage, the {fmt(setup.slPct,2)}% SL distance means you'd lose <strong style={{color:'var(--bear)'}}>{fmtP(slLoss)}</strong> — more than your {fmtP(riskAmt)} max loss target.
-                  {setup.lev > 1 ? ' Reduce leverage or tighten your stop.' : ' Consider a tighter stop or increase your max loss.'}
+            {/* SL tighter than technical warning */}
+            {setup.techSl && riskAmt > 0 && (() => {
+              const riskSlTighter = isLong ? setup.sl > setup.techSl : setup.sl < setup.techSl;
+              if (!riskSlTighter) return null;
+              const diff = Math.abs(setup.sl - setup.techSl);
+              const diffPct = (diff / setup.entry * 100).toFixed(2);
+              return (
+                <div style={{background:'var(--warn-bg)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:6,padding:'8px 10px',marginBottom:8,fontSize:11,lineHeight:1.5}}>
+                  <div style={{color:'var(--warn)',fontWeight:600,marginBottom:3}}>SL is tighter than technical level</div>
+                  <div style={{color:'var(--dim)'}}>
+                    Your risk-based SL ({fmtP(setup.sl)}) is {diffPct}% tighter than the technical SL ({fmtP(setup.techSl)}). You may get stopped out before the real support/resistance level. Consider reducing leverage or increasing your max loss to give the trade room.
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Leverage Comparison Table */}
             <div style={{marginBottom:8}}>
@@ -1510,6 +1530,7 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, userLev, onCapitalChange,
                   <tr>
                     <th>Lev</th>
                     <th style={{textAlign:'right'}}>Position</th>
+                    <th style={{textAlign:'right'}}>SL Price</th>
                     <th style={{textAlign:'right'}}>SL Loss</th>
                     <th style={{textAlign:'right'}}>TP1 Gain</th>
                     <th style={{textAlign:'right'}}>Liq Price</th>
@@ -1519,15 +1540,19 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, userLev, onCapitalChange,
                   {LEV_OPTIONS.map(l => {
                     const pos = tradeCapital * l;
                     const btc = pos / setup.entry;
-                    const loss = pos * (setup.slPct / 100);
+                    const slP = riskAmt > 0 && pos > 0
+                      ? (isLong ? setup.entry * (1 - riskAmt/pos) : setup.entry * (1 + riskAmt/pos))
+                      : setup.techSl;
                     const tp1Gain = Math.abs(setup.tps[0].price - setup.entry) * btc * (setup.tps[0].pct / 100);
                     const liq = l > 1 ? (isLong ? setup.entry * (1 - 1/l) : setup.entry * (1 + 1/l)) : null;
                     const active = l === userLev;
+                    const tighterThanTech = isLong ? slP > setup.techSl : slP < setup.techSl;
                     return (
                       <tr key={l} style={{background: active ? 'var(--accent-bg)' : 'transparent', cursor:'pointer'}} onClick={() => onLevChange(l)}>
                         <td style={{fontWeight: active ? 700 : 400, color: active ? 'var(--accent)' : 'var(--dim)'}}>{l}x{active ? ' *' : ''}</td>
                         <td style={{textAlign:'right',color:'var(--text)'}}>{fmtP(pos)}</td>
-                        <td style={{textAlign:'right',color:'var(--bear)'}}>-{fmtP(loss)}</td>
+                        <td style={{textAlign:'right',color: tighterThanTech ? 'var(--warn)' : 'var(--bear)'}}>{fmtP(slP)}</td>
+                        <td style={{textAlign:'right',color:'var(--bear)'}}>-{fmtP(riskAmt > 0 ? riskAmt : pos * Math.abs(setup.techSl - setup.entry) / setup.entry)}</td>
                         <td style={{textAlign:'right',color:'var(--bull)'}}>+{fmtP(tp1Gain)}</td>
                         <td style={{textAlign:'right',color: l > 3 ? 'var(--warn)' : 'var(--dim)'}}>{liq ? fmtP(liq) : '—'}</td>
                       </tr>
@@ -1535,6 +1560,7 @@ function TradeSetupCard({setup, tradeCapital, riskAmt, userLev, onCapitalChange,
                   })}
                 </tbody>
               </table>
+              {setup.techSl && <div style={{fontSize:10,color:'var(--muted)',marginTop:4}}>Technical SL: {fmtP(setup.techSl)} (-{fmt(setup.techSlPct)}%) — based on ATR, swing lows, order blocks</div>}
             </div>
           </>);
         })()}
