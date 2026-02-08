@@ -1231,25 +1231,36 @@ const TradeLog = {
     return {total: closed.length, open: log.filter(t => t.status === 'open').length, wins: wins.length, losses: losses.length, expired: expired.length, totalPnl, winRate, avgWin, avgLoss};
   },
 
-  exportExcel(log) {
-    const rows = log.map(t => ({
-      'Time': new Date(t.openTime).toLocaleString(),
-      'Strategy': t.stratName,
-      'TF': t.tf,
-      'Direction': t.dir.toUpperCase(),
-      'Confidence': t.conf + '%',
-      'Entry': t.entry?.toFixed(2),
-      'SL': t.sl?.toFixed(2),
-      'TP1': t.tp1?.toFixed(2),
-      'TP2': t.tp2?.toFixed(2),
-      'Status': t.status.toUpperCase(),
-      'Close Price': t.closePrice?.toFixed(2) || '—',
-      'P&L %': t.pnlPct != null ? t.pnlPct.toFixed(3) + '%' : '—',
-      'Close Time': t.closeTime ? new Date(t.closeTime).toLocaleString() : '—',
-      'Reason': t.reason,
-    }));
+  exportExcel(log, tradeCapital, lev) {
+    const posUSD = (tradeCapital || 0) * Math.max(1, lev || 1);
+    const rows = log.map(t => {
+      let dollarPnl = '—';
+      if (t.pnlPct != null && t.entry && posUSD > 0) {
+        const posBTC = posUSD / t.entry;
+        const priceDiff = t.closePrice ? Math.abs(t.closePrice - t.entry) : 0;
+        const sign = t.pnlPct >= 0 ? 1 : -1;
+        dollarPnl = (sign * posBTC * priceDiff).toFixed(2);
+      }
+      return {
+        'Time': new Date(t.openTime).toLocaleString(),
+        'Strategy': t.stratName,
+        'TF': t.tf,
+        'Direction': t.dir.toUpperCase(),
+        'Confidence': t.conf + '%',
+        'Entry': t.entry?.toFixed(2),
+        'SL': t.sl?.toFixed(2),
+        'TP1': t.tp1?.toFixed(2),
+        'TP2': t.tp2?.toFixed(2),
+        'Status': t.status.toUpperCase(),
+        'Close Price': t.closePrice?.toFixed(2) || '—',
+        'P&L %': t.pnlPct != null ? t.pnlPct.toFixed(3) + '%' : '—',
+        '$ P&L': dollarPnl,
+        'Close Time': t.closeTime ? new Date(t.closeTime).toLocaleString() : '—',
+        'Reason': t.reason,
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
-    const colWidths = [{wch:18},{wch:22},{wch:5},{wch:7},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:10},{wch:18},{wch:50}];
+    const colWidths = [{wch:18},{wch:22},{wch:5},{wch:7},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:10},{wch:12},{wch:18},{wch:50}];
     ws['!cols'] = colWidths;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Scalp Log');
@@ -1923,9 +1934,23 @@ function QuickReference() {
 // ═══════════════════════════════════════════════════════════════
 // REACT COMPONENT: Trade Log Panel
 // ═══════════════════════════════════════════════════════════════
-function TradeLogPanel({log, onClear}) {
+function TradeLogPanel({log, onClear, tradeCapital, userLev}) {
   const [showAll, setShowAll] = useState(false);
-  const stats = useMemo(() => TradeLog.getStats(log), [log]);
+  const lev = Math.max(1, userLev);
+  const posUSD = tradeCapital * lev;
+  const calcDollarPnl = (t) => {
+    if (t.pnlPct == null || !t.entry) return null;
+    const posBTC = posUSD / t.entry;
+    const priceDiff = t.closePrice ? Math.abs(t.closePrice - t.entry) : 0;
+    const sign = t.pnlPct >= 0 ? 1 : -1;
+    return sign * posBTC * priceDiff;
+  };
+  const stats = useMemo(() => {
+    const s = TradeLog.getStats(log);
+    const closed = log.filter(t => t.status !== 'open');
+    s.totalDollar = closed.reduce((sum, t) => sum + (calcDollarPnl(t) || 0), 0);
+    return s;
+  }, [log, posUSD]);
   const displayed = showAll ? log.slice().reverse() : log.slice().reverse().slice(0, 20);
   const fmtTime = ts => {
     if (!ts) return '—';
@@ -1938,6 +1963,10 @@ function TradeLogPanel({log, onClear}) {
     if (s === 'loss') return <span className="badge badge-bear" style={{fontSize:9}}>LOSS</span>;
     if (s === 'expired') return <span className="badge badge-warn" style={{fontSize:9}}>EXPIRED</span>;
     return <span className="badge badge-neutral" style={{fontSize:9}}>OPEN</span>;
+  };
+  const confBar = c => {
+    const color = c >= 75 ? 'var(--bull)' : c >= 65 ? 'var(--accent)' : 'var(--warn)';
+    return <div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:11,fontWeight:600,color,minWidth:28}}>{c}%</span><div style={{flex:1,height:4,borderRadius:2,background:'var(--border)',minWidth:30}}><div style={{width:`${c}%`,height:'100%',borderRadius:2,background:color}}/></div></div>;
   };
 
   return (
@@ -1952,13 +1981,15 @@ function TradeLogPanel({log, onClear}) {
           <div className="log-stat"><div className="val" style={{color:'var(--bull)'}}>{stats.wins}</div><div className="lbl">Wins</div></div>
           <div className="log-stat"><div className="val" style={{color:'var(--bear)'}}>{stats.losses}</div><div className="lbl">Losses</div></div>
           <div className="log-stat"><div className="val" style={{color: stats.winRate >= 50 ? 'var(--bull)' : 'var(--bear)'}}>{stats.winRate.toFixed(0)}%</div><div className="lbl">Win Rate</div></div>
-          <div className="log-stat"><div className="val" style={{color: stats.totalPnl >= 0 ? 'var(--bull)' : 'var(--bear)'}}>{stats.totalPnl >= 0 ? '+' : ''}{stats.totalPnl.toFixed(2)}%</div><div className="lbl">Total P&L</div></div>
+          <div className="log-stat"><div className="val" style={{color: stats.totalPnl >= 0 ? 'var(--bull)' : 'var(--bear)'}}>{stats.totalPnl >= 0 ? '+' : ''}{stats.totalPnl.toFixed(2)}%</div><div className="lbl">Total P&L %</div></div>
+          <div className="log-stat"><div className="val" style={{color: stats.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)',fontSize:18}}>{stats.totalDollar >= 0 ? '+' : ''}${Math.abs(stats.totalDollar).toFixed(2)}</div><div className="lbl">Total $ P&L</div></div>
           <div className="log-stat"><div className="val bull">{stats.avgWin > 0 ? '+' : ''}{stats.avgWin.toFixed(3)}%</div><div className="lbl">Avg Win</div></div>
           <div className="log-stat"><div className="val bear">{stats.avgLoss.toFixed(3)}%</div><div className="lbl">Avg Loss</div></div>
         </div>
+        <div style={{fontSize:11,color:'var(--muted)',marginBottom:8}}>$ P&L based on ${tradeCapital.toLocaleString()} capital at {lev}x leverage (${posUSD.toLocaleString()} position)</div>
 
         <div className="log-toolbar">
-          <button className="btn" style={{background:'var(--bull-dim)',borderColor:'var(--bull)',color:'#fff',fontSize:12,display:'flex',alignItems:'center',gap:5}} onClick={() => TradeLog.exportExcel(log)}>
+          <button className="btn" style={{background:'var(--bull-dim)',borderColor:'var(--bull)',color:'#fff',fontSize:12,display:'flex',alignItems:'center',gap:5}} onClick={() => TradeLog.exportExcel(log, tradeCapital, lev)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
             Export Excel
           </button>
@@ -1976,29 +2007,38 @@ function TradeLogPanel({log, onClear}) {
                   <th>Strategy</th>
                   <th>TF</th>
                   <th>Dir</th>
+                  <th>Conf</th>
                   <th>Entry</th>
                   <th>SL</th>
                   <th>TP1</th>
                   <th>Status</th>
-                  <th>P&L</th>
+                  <th>P&L %</th>
+                  <th>$ P&L</th>
                 </tr>
               </thead>
               <tbody>
-                {displayed.map(t => (
-                  <tr key={t.id} className={t.status.startsWith('win') ? 'log-row-win' : t.status === 'loss' ? 'log-row-loss' : ''}>
-                    <td style={{fontSize:11,whiteSpace:'nowrap'}}>{fmtTime(t.openTime)}</td>
-                    <td style={{fontSize:11}}>{t.stratName}</td>
-                    <td>{t.tf}</td>
-                    <td className={t.dir === 'long' ? 'bull' : 'bear'}>{t.dir.toUpperCase()}</td>
-                    <td>${t.entry?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
-                    <td className="bear">${t.sl?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
-                    <td className="bull">${t.tp1?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
-                    <td>{statusBadge(t.status)}</td>
-                    <td className={t.pnlPct > 0 ? 'bull' : t.pnlPct < 0 ? 'bear' : 'muted'} style={{fontWeight:600}}>
-                      {t.pnlPct != null ? `${t.pnlPct > 0 ? '+' : ''}${t.pnlPct.toFixed(3)}%` : '—'}
-                    </td>
-                  </tr>
-                ))}
+                {displayed.map(t => {
+                  const dollarPnl = calcDollarPnl(t);
+                  return (
+                    <tr key={t.id} className={t.status.startsWith('win') ? 'log-row-win' : t.status === 'loss' ? 'log-row-loss' : ''}>
+                      <td style={{fontSize:11,whiteSpace:'nowrap'}}>{fmtTime(t.openTime)}</td>
+                      <td style={{fontSize:11}}>{t.stratName}</td>
+                      <td>{t.tf}</td>
+                      <td className={t.dir === 'long' ? 'bull' : 'bear'}>{t.dir.toUpperCase()}</td>
+                      <td>{confBar(t.conf)}</td>
+                      <td>${t.entry?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+                      <td className="bear">${t.sl?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+                      <td className="bull">${t.tp1?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+                      <td>{statusBadge(t.status)}</td>
+                      <td className={t.pnlPct > 0 ? 'bull' : t.pnlPct < 0 ? 'bear' : 'muted'} style={{fontWeight:600}}>
+                        {t.pnlPct != null ? `${t.pnlPct > 0 ? '+' : ''}${t.pnlPct.toFixed(3)}%` : '—'}
+                      </td>
+                      <td className={dollarPnl > 0 ? 'bull' : dollarPnl < 0 ? 'bear' : 'muted'} style={{fontWeight:700}}>
+                        {dollarPnl != null ? `${dollarPnl > 0 ? '+' : '-'}$${Math.abs(dollarPnl).toFixed(2)}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -2116,7 +2156,7 @@ function App() {
           <QuickReference />
         </div>
       </div>
-      <TradeLogPanel log={tradeLogData} onClear={handleClearLog} />
+      <TradeLogPanel log={tradeLogData} onClear={handleClearLog} tradeCapital={tradeCapital} userLev={userLev} />
       <div className="footer">
         BTC Scalp Lab — Real-time scalp trading education & signals. Data from Binance. Refreshes every {REFRESH_MS/1000}s.
         <br/>Not financial advice. Trade at your own risk. <a href="index.html" style={{color:'var(--accent)'}}>Back to Signal Desk</a>
