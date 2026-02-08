@@ -1640,14 +1640,21 @@ function ActiveScalpSetups({setups, tradeCapital, riskAmt, userLev}) {
           return (
             <div key={i} className={`card ${isLong ? 'glow-bull' : 'glow-bear'} fade-in`} style={{background:'var(--card2)'}}>
               <div style={{padding:'10px 14px'}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
                   <span className={`badge ${isLong ? 'badge-bull' : 'badge-bear'}`}>{s.dir.toUpperCase()}</span>
                   <span style={{color:'var(--text)',fontWeight:600,fontSize:14}}>{s.stratName}</span>
                   <span className="badge badge-neutral" style={{fontSize:10}}>{s.tf}</span>
-                  <span style={{marginLeft:'auto',color:'var(--muted)',fontSize:11}}>Confidence: {s.conf}%</span>
-                </div>
-                <div className="meter-bar" style={{marginBottom:10}}>
-                  <div className="meter-fill" style={{width:`${s.conf}%`, background:isLong ? 'var(--bull)' : 'var(--bear)'}} />
+                  <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
+                    <div style={{
+                      width:48,height:48,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',
+                      background:`conic-gradient(${s.conf >= 75 ? 'var(--bull)' : s.conf >= 65 ? 'var(--accent)' : 'var(--warn)'} ${s.conf * 3.6}deg, var(--border) 0deg)`,
+                      position:'relative',
+                    }}>
+                      <div style={{width:38,height:38,borderRadius:'50%',background:'var(--card2)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <span style={{fontSize:15,fontWeight:800,color: s.conf >= 75 ? 'var(--bull)' : s.conf >= 65 ? 'var(--accent)' : 'var(--warn)',fontFamily:'JetBrains Mono,monospace'}}>{s.conf}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div style={{fontSize:12,color:'var(--dim)',marginBottom:10,lineHeight:1.5}}>{s.reason}</div>
                 <table>
