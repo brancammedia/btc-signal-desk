@@ -1293,6 +1293,7 @@ function Header({livePrice, change24h, lastRefresh, onRefresh}) {
         ))}
       </div>
       <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,fontSize:11,color:'var(--muted)'}}>
+        <a href="scalp.html" style={{color:'var(--warn)',textDecoration:'none',fontWeight:600,fontSize:12}}>Scalp Lab</a>
         {lastRefresh && <span>Updated {lastRefresh.toLocaleTimeString()}</span>}
         <button className="btn" onClick={onRefresh}>Refresh</button>
       </div>
