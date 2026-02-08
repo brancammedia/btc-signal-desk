@@ -1530,6 +1530,56 @@ function RiskGuide() {
           ))}
         </div>
 
+        <div className="sub-h" style={{marginTop:16}}>Daily Loss Limits</div>
+        <table style={{marginTop:6,marginBottom:12}}>
+          <thead><tr><th>Rule</th><th>Limit</th></tr></thead>
+          <tbody>
+            <tr><td className="text">Max loss per trade</td><td>0.5% of account (5m/15m) or 1% (1H)</td></tr>
+            <tr><td className="text">Max daily loss</td><td className="bear">2% of account — then STOP for the day</td></tr>
+            <tr><td className="text">Max consecutive losses</td><td className="warn">3 trades — then 1 hour cooldown minimum</td></tr>
+            <tr><td className="text">Weekly max drawdown</td><td className="bear">5% of account</td></tr>
+            <tr><td className="text">After 2 consecutive wins</td><td className="bull">Take a 30-min break (avoid overconfidence)</td></tr>
+          </tbody>
+        </table>
+
+        <div className="sub-h" style={{marginTop:16}}>Stop Loss Reference by Timeframe</div>
+        <table style={{marginTop:6,marginBottom:12}}>
+          <thead><tr><th>Timeframe</th><th>ATR Multiple</th><th>Max % Stop</th><th>Time Stop (candles)</th></tr></thead>
+          <tbody>
+            <tr><td className="text">1m</td><td>0.8-1.0x ATR(10)</td><td>0.10-0.15%</td><td>10-15 candles</td></tr>
+            <tr><td className="text">5m</td><td>1.0-1.5x ATR(14)</td><td>0.15-0.25%</td><td>6-10 candles (30-50 min)</td></tr>
+            <tr><td className="text">15m</td><td>1.5-2.0x ATR(14)</td><td>0.25-0.40%</td><td>4-6 candles (1-1.5 hrs)</td></tr>
+            <tr><td className="text">1H</td><td>2.0-2.5x ATR(14)</td><td>0.40-0.75%</td><td>3-4 candles (3-4 hrs)</td></tr>
+          </tbody>
+        </table>
+        <div style={{fontSize:11,color:'var(--warn)',marginBottom:12,lineHeight:1.5}}>
+          <strong>Time-based stops:</strong> If price has not moved in your direction by the halfway mark, move stop to breakeven. If it hasn't hit TP1 by the max candle count, close the trade. A good scalp shows follow-through quickly.
+        </div>
+
+        <div className="sub-h" style={{marginTop:16}}>Fee Impact on Scalps (Critical)</div>
+        <table style={{marginTop:6,marginBottom:6}}>
+          <thead><tr><th>Round-Trip Fee</th><th>Min R:R @ 50% WR</th><th>Min R:R @ 60% WR</th></tr></thead>
+          <tbody>
+            <tr><td className="text">0.05%</td><td>1.15:1</td><td>0.85:1</td></tr>
+            <tr><td className="text">0.10%</td><td>1.25:1</td><td>0.95:1</td></tr>
+            <tr><td className="text">0.15%</td><td>1.35:1</td><td>1.05:1</td></tr>
+            <tr><td className="text">0.20%</td><td className="bear">1.50:1</td><td>1.15:1</td></tr>
+          </tbody>
+        </table>
+        <div style={{fontSize:11,color:'var(--muted)',marginBottom:12,lineHeight:1.5}}>
+          Always calculate <strong style={{color:'var(--text)'}}>Net R:R = (Gross Profit - Fees) / (Gross Loss + Fees)</strong>. Use limit orders (maker fees are 50-75% lower). Your potential profit at 1:1 R:R must be at least 3x your round-trip fee cost.
+        </div>
+
+        <div className="sub-h" style={{marginTop:16}}>Partial Profit Scale-Out (Recommended)</div>
+        <table style={{marginTop:6,marginBottom:6}}>
+          <thead><tr><th>Portion</th><th>Action</th><th>Then</th></tr></thead>
+          <tbody>
+            <tr><td className="text">50%</td><td className="bull">Take profit at 1:1 R:R</td><td>Move stop to breakeven</td></tr>
+            <tr><td className="text">25%</td><td className="bull">Take profit at 1.5-2:1 R:R</td><td>Trail stop on remainder</td></tr>
+            <tr><td className="text">25%</td><td className="accent">Trail with 9 EMA (5m) or prev candle low (15m)</td><td>Let it run</td></tr>
+          </tbody>
+        </table>
+
         <div className="sub-h" style={{marginTop:16}}>Session Timing Guide</div>
         <table style={{marginTop:6}}>
           <thead><tr><th>Session</th><th>UTC Time</th><th>Quality</th><th>Notes</th></tr></thead>
