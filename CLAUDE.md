@@ -106,6 +106,19 @@ Single-file HTML application (`index.html`) for real-time Bitcoin technical anal
   - Confidence column with visual progress bar
   - Strategy Breakdown table (per-strategy W/L/Win%/P&L)
   - Confidence Bracket Breakdown (win rate by 80+/70-79/60-69/<60%)
+- **Risk-Based SL**: SL = Entry × (1 - MaxLoss/Position), adjusts with leverage
+  - Technical SL shown as faded reference row when different
+  - Warning when risk SL is tighter than technical level
+  - Leverage comparison table per setup (1x/3x/5x/10x)
+- **Strategy Detection Tuning** (post-overnight test):
+  - EMA MACD filter: requires BOTH positive AND growing histogram
+  - StochRSI: thresholds tightened to 20/80, requires confirmation candle
+  - Liquidity Sweep: conf 80→72, volume confirmation, tighter wick ratio
+  - Order Block: SL 0.3→0.5 ATR, TP 2/3→1.5/2.5 ATR
+  - CHOCH: TP1 now real profit level (was CHOCH trigger price)
+  - Candlestick: min body size, tighter pin bar ratio, 0.2% level proximity
+- **TF-Aware Expiry**: 1m=30min, 5m=2h, 15m=4h, 1h=8h (was flat 4h)
+- **Minimum 50 candles** for indicator warmup (was 30)
 
 ## Known Considerations
 - Binance.com blocked in US — app uses api.binance.us as primary with fallbacks
