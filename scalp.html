@@ -130,6 +130,15 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
 .check-fail{background:var(--bear-bg);color:var(--bear);border:1px solid var(--bear-dim);}
 .check-na{background:var(--accent-bg);color:var(--muted);border:1px solid var(--border);}
 
+/* Trade Log */
+.log-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.log-stat{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;min-width:80px;text-align:center;}
+.log-stat .val{font-size:20px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;}
+.log-stat .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+.log-row-win{background:rgba(34,197,94,0.04);}
+.log-row-loss{background:rgba(239,68,68,0.04);}
+.log-toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+
 /* Animations */
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -174,6 +183,10 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
   .m-playbook{order:5!important;}
   .m-risk{order:6!important;}
   .m-ref{order:7!important;}
+  .log-stats{gap:6px;}
+  .log-stat{min-width:60px;padding:6px 8px;}
+  .log-stat .val{font-size:16px;}
+  .log-stat .lbl{font-size:9px;}
 }
 @media(max-width:480px){
   .header h1{font-size:16px!important;}
@@ -189,6 +202,7 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback,useMemo} = React;
 
@@ -1072,6 +1086,178 @@ function getScalpChecklist(scanResults, livePrice) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TRADE LOG ENGINE — auto-tracks signal performance
+// ═══════════════════════════════════════════════════════════════
+const LOG_KEY = 'scalp-lab-trade-log';
+const LOG_DEDUP_MS = 30 * 60 * 1000; // 30 min dedup window
+
+const TradeLog = {
+  _load() {
+    try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch { return []; }
+  },
+  _save(log) {
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch {}
+  },
+  getAll() { return this._load(); },
+  clear() { this._save([]); },
+
+  // Log new setups (deduplicates by strategy+tf+dir within 30 min)
+  logSetups(setups) {
+    const log = this._load();
+    const now = Date.now();
+    let added = 0;
+    for (const s of setups) {
+      const isDup = log.some(t =>
+        t.stratId === s.stratId && t.tf === s.tf && t.dir === s.dir &&
+        t.status === 'open' && (now - t.openTime) < LOG_DEDUP_MS
+      );
+      if (isDup) continue;
+      log.push({
+        id: now + '_' + Math.random().toString(36).slice(2, 7),
+        stratId: s.stratId,
+        stratName: s.stratName,
+        tf: s.tf,
+        dir: s.dir,
+        conf: s.conf,
+        entry: s.entry,
+        sl: s.sl,
+        tp1: s.tp1,
+        tp2: s.tp2,
+        reason: s.reason,
+        openTime: now,
+        status: 'open', // open | win-tp1 | win-tp2 | loss
+        closeTime: null,
+        closePrice: null,
+        pnlPct: null,
+        tp1Hit: false,
+      });
+      added++;
+    }
+    if (added > 0) this._save(log);
+    return added;
+  },
+
+  // Check open trades against current price data (1m candles for precision)
+  checkOutcomes(candles1m) {
+    if (!candles1m || candles1m.length < 2) return;
+    const log = this._load();
+    let changed = false;
+    for (const t of log) {
+      if (t.status !== 'open' && t.status !== 'win-tp1') continue;
+      const isLong = t.dir === 'long';
+      // Find candles after this trade was opened
+      const relevantCandles = candles1m.filter(c => c.time >= t.openTime);
+      if (relevantCandles.length === 0) continue;
+
+      for (const c of relevantCandles) {
+        // Check SL hit
+        const slHit = isLong ? c.low <= t.sl : c.high >= t.sl;
+        // Check TP1 hit
+        const tp1Hit = isLong ? c.high >= t.tp1 : c.low <= t.tp1;
+        // Check TP2 hit
+        const tp2Hit = isLong ? c.high >= t.tp2 : c.low <= t.tp2;
+
+        if (t.status === 'open') {
+          if (slHit && !tp1Hit) {
+            // SL hit before TP1
+            t.status = 'loss';
+            t.closeTime = c.time;
+            t.closePrice = t.sl;
+            t.pnlPct = isLong ? ((t.sl - t.entry) / t.entry) * 100 : ((t.entry - t.sl) / t.entry) * 100;
+            changed = true;
+            break;
+          }
+          if (tp1Hit) {
+            t.tp1Hit = true;
+            if (tp2Hit) {
+              // TP2 hit (full win)
+              t.status = 'win-tp2';
+              t.closeTime = c.time;
+              t.closePrice = t.tp2;
+              t.pnlPct = isLong ? ((t.tp2 - t.entry) / t.entry) * 100 : ((t.entry - t.tp2) / t.entry) * 100;
+              changed = true;
+              break;
+            }
+            // TP1 hit, move to partial win tracking (SL now at breakeven)
+            t.status = 'win-tp1';
+            t.closeTime = c.time;
+            t.closePrice = t.tp1;
+            t.pnlPct = isLong ? ((t.tp1 - t.entry) / t.entry) * 100 : ((t.entry - t.tp1) / t.entry) * 100;
+            changed = true;
+            // Continue checking for TP2 or SL at breakeven
+          }
+        }
+        if (t.status === 'win-tp1') {
+          // After TP1, SL is at breakeven (entry)
+          const beSlHit = isLong ? c.low <= t.entry : c.high >= t.entry;
+          if (tp2Hit) {
+            t.status = 'win-tp2';
+            t.closeTime = c.time;
+            t.closePrice = t.tp2;
+            t.pnlPct = isLong ? ((t.tp2 - t.entry) / t.entry) * 100 : ((t.entry - t.tp2) / t.entry) * 100;
+            changed = true;
+            break;
+          }
+          if (beSlHit && !tp2Hit) {
+            // Stopped at breakeven after TP1 — keep as win-tp1
+            break;
+          }
+        }
+      }
+
+      // Time-based expiry: if open > 4 hours, expire it
+      if (t.status === 'open' && (Date.now() - t.openTime) > 4 * 60 * 60 * 1000) {
+        const lastCandle = candles1m[candles1m.length - 1];
+        const curPrice = lastCandle ? lastCandle.close : t.entry;
+        t.status = 'expired';
+        t.closeTime = Date.now();
+        t.closePrice = curPrice;
+        t.pnlPct = isLong ? ((curPrice - t.entry) / t.entry) * 100 : ((t.entry - curPrice) / t.entry) * 100;
+        changed = true;
+      }
+    }
+    if (changed) this._save(log);
+  },
+
+  getStats(log) {
+    const closed = log.filter(t => t.status !== 'open');
+    const wins = closed.filter(t => t.status === 'win-tp1' || t.status === 'win-tp2');
+    const losses = closed.filter(t => t.status === 'loss');
+    const expired = closed.filter(t => t.status === 'expired');
+    const totalPnl = closed.reduce((s, t) => s + (t.pnlPct || 0), 0);
+    const winRate = closed.length > 0 ? (wins.length / (wins.length + losses.length) * 100) : 0;
+    const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnlPct, 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? losses.reduce((s, t) => s + t.pnlPct, 0) / losses.length : 0;
+    return {total: closed.length, open: log.filter(t => t.status === 'open').length, wins: wins.length, losses: losses.length, expired: expired.length, totalPnl, winRate, avgWin, avgLoss};
+  },
+
+  exportExcel(log) {
+    const rows = log.map(t => ({
+      'Time': new Date(t.openTime).toLocaleString(),
+      'Strategy': t.stratName,
+      'TF': t.tf,
+      'Direction': t.dir.toUpperCase(),
+      'Confidence': t.conf + '%',
+      'Entry': t.entry?.toFixed(2),
+      'SL': t.sl?.toFixed(2),
+      'TP1': t.tp1?.toFixed(2),
+      'TP2': t.tp2?.toFixed(2),
+      'Status': t.status.toUpperCase(),
+      'Close Price': t.closePrice?.toFixed(2) || '—',
+      'P&L %': t.pnlPct != null ? t.pnlPct.toFixed(3) + '%' : '—',
+      'Close Time': t.closeTime ? new Date(t.closeTime).toLocaleString() : '—',
+      'Reason': t.reason,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const colWidths = [{wch:18},{wch:22},{wch:5},{wch:7},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:10},{wch:18},{wch:50}];
+    ws['!cols'] = colWidths;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Scalp Log');
+    XLSX.writeFile(wb, `scalp-log-${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════
 // SESSIONS & TIMERS
 // ═══════════════════════════════════════════════════════════════
 const SESSIONS = [
@@ -1734,6 +1920,99 @@ function QuickReference() {
 // ═══════════════════════════════════════════════════════════════
 // APP
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// REACT COMPONENT: Trade Log Panel
+// ═══════════════════════════════════════════════════════════════
+function TradeLogPanel({log, onClear}) {
+  const [showAll, setShowAll] = useState(false);
+  const stats = useMemo(() => TradeLog.getStats(log), [log]);
+  const displayed = showAll ? log.slice().reverse() : log.slice().reverse().slice(0, 20);
+  const fmtTime = ts => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' ' + d.toLocaleDateString([], {month:'short',day:'numeric'});
+  };
+  const statusBadge = s => {
+    if (s === 'win-tp1') return <span className="badge badge-bull" style={{fontSize:9}}>WIN TP1</span>;
+    if (s === 'win-tp2') return <span className="badge badge-bull" style={{fontSize:9}}>WIN TP2</span>;
+    if (s === 'loss') return <span className="badge badge-bear" style={{fontSize:9}}>LOSS</span>;
+    if (s === 'expired') return <span className="badge badge-warn" style={{fontSize:9}}>EXPIRED</span>;
+    return <span className="badge badge-neutral" style={{fontSize:9}}>OPEN</span>;
+  };
+
+  return (
+    <div className="card m-log bottom-panel">
+      <div className="card-head">
+        <span>Signal Performance Log ({log.length} signals)</span>
+        <span style={{fontSize:11,color:'var(--muted)'}}>Auto-tracking</span>
+      </div>
+      <div className="card-body">
+        <div className="log-stats">
+          <div className="log-stat"><div className="val" style={{color:'var(--accent)'}}>{stats.open}</div><div className="lbl">Open</div></div>
+          <div className="log-stat"><div className="val" style={{color:'var(--bull)'}}>{stats.wins}</div><div className="lbl">Wins</div></div>
+          <div className="log-stat"><div className="val" style={{color:'var(--bear)'}}>{stats.losses}</div><div className="lbl">Losses</div></div>
+          <div className="log-stat"><div className="val" style={{color: stats.winRate >= 50 ? 'var(--bull)' : 'var(--bear)'}}>{stats.winRate.toFixed(0)}%</div><div className="lbl">Win Rate</div></div>
+          <div className="log-stat"><div className="val" style={{color: stats.totalPnl >= 0 ? 'var(--bull)' : 'var(--bear)'}}>{stats.totalPnl >= 0 ? '+' : ''}{stats.totalPnl.toFixed(2)}%</div><div className="lbl">Total P&L</div></div>
+          <div className="log-stat"><div className="val bull">{stats.avgWin > 0 ? '+' : ''}{stats.avgWin.toFixed(3)}%</div><div className="lbl">Avg Win</div></div>
+          <div className="log-stat"><div className="val bear">{stats.avgLoss.toFixed(3)}%</div><div className="lbl">Avg Loss</div></div>
+        </div>
+
+        <div className="log-toolbar">
+          <button className="btn" style={{background:'var(--bull-dim)',borderColor:'var(--bull)',color:'#fff',fontSize:12,display:'flex',alignItems:'center',gap:5}} onClick={() => TradeLog.exportExcel(log)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Export Excel
+          </button>
+          <button className="btn" style={{fontSize:12}} onClick={() => setShowAll(!showAll)}>{showAll ? 'Show Recent' : `Show All (${log.length})`}</button>
+          {log.length > 0 && <button className="btn" style={{fontSize:12,color:'var(--bear)'}} onClick={() => { if (confirm('Clear all logged signals? This cannot be undone.')) onClear(); }}>Clear Log</button>}
+          <span style={{fontSize:11,color:'var(--muted)',marginLeft:'auto'}}>Updates every 30s</span>
+        </div>
+
+        {displayed.length > 0 ? (
+          <div style={{overflowX:'auto'}}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Strategy</th>
+                  <th>TF</th>
+                  <th>Dir</th>
+                  <th>Entry</th>
+                  <th>SL</th>
+                  <th>TP1</th>
+                  <th>Status</th>
+                  <th>P&L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayed.map(t => (
+                  <tr key={t.id} className={t.status.startsWith('win') ? 'log-row-win' : t.status === 'loss' ? 'log-row-loss' : ''}>
+                    <td style={{fontSize:11,whiteSpace:'nowrap'}}>{fmtTime(t.openTime)}</td>
+                    <td style={{fontSize:11}}>{t.stratName}</td>
+                    <td>{t.tf}</td>
+                    <td className={t.dir === 'long' ? 'bull' : 'bear'}>{t.dir.toUpperCase()}</td>
+                    <td>${t.entry?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+                    <td className="bear">${t.sl?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+                    <td className="bull">${t.tp1?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+                    <td>{statusBadge(t.status)}</td>
+                    <td className={t.pnlPct > 0 ? 'bull' : t.pnlPct < 0 ? 'bear' : 'muted'} style={{fontWeight:600}}>
+                      {t.pnlPct != null ? `${t.pnlPct > 0 ? '+' : ''}${t.pnlPct.toFixed(3)}%` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{textAlign:'center',color:'var(--muted)',padding:20}}>No signals logged yet. The scanner will auto-log setups as they appear.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APP
+// ═══════════════════════════════════════════════════════════════
 function App() {
   const [status, setStatus] = useState('Initializing...');
   const [data, setData] = useState(null);
@@ -1784,6 +2063,28 @@ function App() {
   const bestSetups = useMemo(() => getBestSetups(scanResults), [scanResults]);
   const checks = useMemo(() => getScalpChecklist(scanResults, livePrice || (data?.ticker ? +data.ticker.lastPrice : 0)), [scanResults, livePrice, data]);
 
+  // Trade log state
+  const [tradeLogData, setTradeLogData] = useState(() => TradeLog.getAll());
+
+  // Auto-log new setups and check outcomes on each data refresh
+  useEffect(() => {
+    if (!bestSetups || bestSetups.length === 0) return;
+    TradeLog.logSetups(bestSetups);
+    setTradeLogData(TradeLog.getAll());
+  }, [bestSetups]);
+
+  // Check outcomes against 1m candles
+  useEffect(() => {
+    if (!data?.candles?.['1m']) return;
+    TradeLog.checkOutcomes(data.candles['1m']);
+    setTradeLogData(TradeLog.getAll());
+  }, [data]);
+
+  const handleClearLog = useCallback(() => {
+    TradeLog.clear();
+    setTradeLogData([]);
+  }, []);
+
   if (error) return (
     <div>
       <Header ticker={null} livePrice={null} />
@@ -1815,6 +2116,7 @@ function App() {
           <QuickReference />
         </div>
       </div>
+      <TradeLogPanel log={tradeLogData} onClear={handleClearLog} />
       <div className="footer">
         BTC Scalp Lab — Real-time scalp trading education & signals. Data from Binance. Refreshes every {REFRESH_MS/1000}s.
         <br/>Not financial advice. Trade at your own risk. <a href="index.html" style={{color:'var(--accent)'}}>Back to Signal Desk</a>
