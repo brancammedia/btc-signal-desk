@@ -111,11 +111,13 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
 .scanner-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
 
 /* Strategy card expand */
-.strat-card{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;transition:all .2s;}
-.strat-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;background:var(--card2);transition:background .15s;}
+.strat-card{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;transition:all .2s;max-width:100%;}
+.strat-head{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;background:var(--card2);transition:background .15s;flex-wrap:wrap;}
 .strat-head:hover{background:var(--border);}
-.strat-body{padding:12px 14px;display:none;border-top:1px solid var(--border);}
+.strat-body{padding:12px 14px;display:none;border-top:1px solid var(--border);overflow-x:auto;word-wrap:break-word;overflow-wrap:break-word;}
 .strat-body.open{display:block;}
+.strat-body p,.strat-body li{word-wrap:break-word;overflow-wrap:break-word;}
+.grid-2col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .strat-tag{font-size:10px;padding:2px 8px;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
 .diff-1{background:var(--bull-bg);color:var(--bull);}
 .diff-2{background:var(--warn-bg);color:var(--warn);}
@@ -153,7 +155,13 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
   td,th{padding:3px 6px;font-size:11px;}
   td{white-space:normal;word-break:break-word;}
   table{table-layout:auto;}
-  .card{overflow-x:auto;max-width:100vw;}
+  .card{overflow-x:auto;max-width:100vw;box-sizing:border-box;}
+  .strat-body{padding:10px!important;}
+  .strat-body p,.strat-body li{font-size:12px!important;}
+  .strat-body ol,.strat-body ul{padding-left:16px!important;}
+  .strat-head{gap:6px!important;padding:8px 10px!important;}
+  .strat-head span:first-child{font-size:13px!important;}
+  .grid-2col{grid-template-columns:1fr!important;}
   .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
   .tab{flex:0 0 auto;padding:6px 10px;font-size:12px;}
   .info-bubble-fixed{width:220px;font-size:11px;}
@@ -1471,7 +1479,7 @@ function StrategyPlaybook({scanResults}) {
                   {strat.entryRules.map((r, i) => <li key={i} style={{fontSize:13,lineHeight:1.7,color:'var(--text)',marginBottom:4}}>{r}</li>)}
                 </ol>
 
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+                <div className="grid-2col" style={{marginBottom:12}}>
                   <div style={{background:'var(--bear-bg)',borderRadius:6,padding:10,border:'1px solid var(--bear-dim)'}}>
                     <div style={{fontWeight:600,fontSize:12,color:'var(--bear)',marginBottom:4}}>STOP LOSS</div>
                     <div style={{fontSize:12,color:'var(--dim)',lineHeight:1.6}}>{strat.slRule}</div>
@@ -1594,7 +1602,7 @@ function RiskGuide() {
         </table>
 
         <div className="sub-h" style={{marginTop:16}}>Scalping Psychology</div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:6}}>
+        <div className="grid-2col" style={{marginTop:6}}>
           <div style={{background:'var(--bull-bg)',borderRadius:6,padding:10,border:'1px solid var(--bull-dim)'}}>
             <div style={{fontWeight:600,fontSize:12,color:'var(--bull)',marginBottom:6}}>DO</div>
             <ul style={{paddingLeft:16,fontSize:11,lineHeight:1.8,color:'var(--dim)'}}>
