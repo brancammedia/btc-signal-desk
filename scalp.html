@@ -1089,26 +1089,144 @@ function getScalpChecklist(scanResults, livePrice) {
 // TRADE LOG ENGINE — auto-tracks signal performance
 // ═══════════════════════════════════════════════════════════════
 const LOG_KEY = 'scalp-lab-trade-log';
+const LOG_IDB_NAME = 'ScalpLabDB';
+const LOG_IDB_STORE = 'tradeLog';
 const LOG_DEDUP_MS = 30 * 60 * 1000; // 30 min dedup window
 const LOG_MIN_CONF = 60; // minimum confidence % to auto-log a signal
 
 const TradeLog = {
+  // ── localStorage (primary, fast) ──
   _load() {
     try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch { return []; }
   },
   _save(log) {
     try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch {}
+    this._saveIDB(log); // dual-write to IndexedDB
   },
+
+  // ── IndexedDB (durable backup, survives cache clears) ──
+  _openIDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(LOG_IDB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(LOG_IDB_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async _saveIDB(log) {
+    try {
+      const db = await this._openIDB();
+      const tx = db.transaction(LOG_IDB_STORE, 'readwrite');
+      tx.objectStore(LOG_IDB_STORE).put(log, 'trades');
+      tx.objectStore(LOG_IDB_STORE).put(Date.now(), 'lastSaved');
+    } catch {}
+  },
+  async _loadIDB() {
+    try {
+      const db = await this._openIDB();
+      return new Promise(resolve => {
+        const tx = db.transaction(LOG_IDB_STORE, 'readonly');
+        const req = tx.objectStore(LOG_IDB_STORE).get('trades');
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
+    } catch { return []; }
+  },
+
+  // ── Restore: tries localStorage first, falls back to IndexedDB ──
+  async restore() {
+    let log = this._load();
+    if (log.length > 0) return log;
+    log = await this._loadIDB();
+    if (log.length > 0) {
+      this._save(log); // sync back to localStorage
+    }
+    return log;
+  },
+
   getAll() { return this._load(); },
   clear() { this._save([]); },
+
+  // ── JSON export/import for cross-device persistence ──
+  exportJSON(log) {
+    const json = JSON.stringify(log, null, 2);
+    const blob = new Blob([json], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `scalp-log-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+  importJSON(jsonStr) {
+    try {
+      const imported = JSON.parse(jsonStr);
+      if (!Array.isArray(imported)) return {added:0, error:'Invalid format'};
+      return this._merge(imported);
+    } catch (e) { return {added:0, error: e.message}; }
+  },
+  importExcel(workbook) {
+    try {
+      const ws = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      const imported = rows.map((r, i) => ({
+        id: 'imp_' + Date.now() + '_' + i,
+        stratId: (r.Strategy || '').toLowerCase().replace(/\s+/g, '-'),
+        stratName: r.Strategy || 'Unknown',
+        tf: r.TF || '?',
+        dir: (r.Direction || '').toLowerCase(),
+        conf: parseInt(r.Confidence) || 0,
+        entry: parseFloat(r.Entry) || 0,
+        sl: parseFloat(r.SL) || 0,
+        tp1: parseFloat(r.TP1) || 0,
+        tp2: parseFloat(r.TP2) || 0,
+        reason: r.Reason || '',
+        openTime: r.Time ? new Date(r.Time).getTime() : Date.now(),
+        status: (r.Status || 'open').toLowerCase().replace(' ', '-'),
+        closeTime: r['Close Time'] && r['Close Time'] !== '—' ? new Date(r['Close Time']).getTime() : null,
+        closePrice: r['Close Price'] && r['Close Price'] !== '—' ? parseFloat(r['Close Price']) : null,
+        pnlPct: r['P&L %'] && r['P&L %'] !== '—' ? parseFloat(r['P&L %']) : null,
+        tp1Hit: false,
+      }));
+      return this._merge(imported);
+    } catch (e) { return {added:0, error: e.message}; }
+  },
+  _merge(imported) {
+    const log = this._load();
+    const existingIds = new Set(log.map(t => t.id));
+    // Deduplicate by matching openTime+strategy+tf+dir (handles imported records without matching IDs)
+    const existingKeys = new Set(log.map(t => `${t.openTime}_${t.stratId}_${t.tf}_${t.dir}`));
+    let added = 0;
+    for (const t of imported) {
+      const key = `${t.openTime}_${t.stratId}_${t.tf}_${t.dir}`;
+      if (existingIds.has(t.id) || existingKeys.has(key)) continue;
+      log.push(t);
+      added++;
+    }
+    if (added > 0) {
+      log.sort((a, b) => a.openTime - b.openTime);
+      this._save(log);
+    }
+    return {added, total: log.length};
+  },
 
   // Log new setups (deduplicates by strategy+tf+dir within 30 min)
   logSetups(setups) {
     const log = this._load();
     const now = Date.now();
     let added = 0;
+
+    // Determine dominant direction from higher-TF setups to prevent direction conflicts
+    const dirVotes = {long:0, short:0};
+    const tfRank = {'1h':4, '15m':3, '5m':2, '1m':1};
+    for (const s of setups) {
+      dirVotes[s.dir] = (dirVotes[s.dir] || 0) + (tfRank[s.tf] || 1);
+    }
+    const dominantDir = dirVotes.long >= dirVotes.short ? 'long' : 'short';
+
     for (const s of setups) {
       if (s.conf < LOG_MIN_CONF) continue; // skip low-confidence signals
+      if (s.dir !== dominantDir) continue; // skip signals opposing the dominant direction
       const isDup = log.some(t =>
         t.stratId === s.stratId && t.tf === s.tf && t.dir === s.dir &&
         t.status === 'open' && (now - t.openTime) < LOG_DEDUP_MS
@@ -1936,9 +2054,11 @@ function QuickReference() {
 // ═══════════════════════════════════════════════════════════════
 // REACT COMPONENT: Trade Log Panel
 // ═══════════════════════════════════════════════════════════════
-function TradeLogPanel({log, onClear, tradeCapital, userLev}) {
+function TradeLogPanel({log, onClear, onImport, tradeCapital, userLev}) {
   const [showAll, setShowAll] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [importMsg, setImportMsg] = useState(null);
+  const fileRef = useRef(null);
   const lev = Math.max(1, userLev);
   const posUSD = tradeCapital * lev;
   const calcDollarPnl = (t) => {
@@ -1995,6 +2115,30 @@ function TradeLogPanel({log, onClear, tradeCapital, userLev}) {
   const confBar = c => {
     const color = c >= 75 ? 'var(--bull)' : c >= 65 ? 'var(--accent)' : 'var(--warn)';
     return <div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:11,fontWeight:600,color,minWidth:28}}>{c}%</span><div style={{flex:1,height:4,borderRadius:2,background:'var(--border)',minWidth:30}}><div style={{width:`${c}%`,height:'100%',borderRadius:2,background:color}}/></div></div>;
+  };
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    if (file.name.endsWith('.json')) {
+      reader.onload = () => {
+        const result = TradeLog.importJSON(reader.result);
+        if (result.error) setImportMsg({type:'error', text:`Import failed: ${result.error}`});
+        else { setImportMsg({type:'ok', text:`Imported ${result.added} new trades (${result.total} total)`}); onImport(); }
+        setTimeout(() => setImportMsg(null), 5000);
+      };
+      reader.readAsText(file);
+    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      reader.onload = () => {
+        const wb = XLSX.read(reader.result, {type:'array'});
+        const result = TradeLog.importExcel(wb);
+        if (result.error) setImportMsg({type:'error', text:`Import failed: ${result.error}`});
+        else { setImportMsg({type:'ok', text:`Imported ${result.added} new trades (${result.total} total)`}); onImport(); }
+        setTimeout(() => setImportMsg(null), 5000);
+      };
+      reader.readAsArrayBuffer(file);
+    }
+    e.target.value = ''; // reset so same file can be re-imported
   };
 
   return (
@@ -2063,14 +2207,31 @@ function TradeLogPanel({log, onClear, tradeCapital, userLev}) {
           </div>
         )}
 
+        {importMsg && (
+          <div style={{padding:'8px 12px',marginBottom:8,borderRadius:6,fontSize:12,fontWeight:600,
+            background: importMsg.type === 'ok' ? 'var(--bull-dim)' : 'rgba(239,68,68,0.15)',
+            color: importMsg.type === 'ok' ? 'var(--bull)' : 'var(--bear)',
+            border: `1px solid ${importMsg.type === 'ok' ? 'var(--bull)' : 'var(--bear)'}`}}>
+            {importMsg.text}
+          </div>
+        )}
+        <input type="file" ref={fileRef} accept=".json,.xlsx,.xls" style={{display:'none'}} onChange={handleImportFile} />
         <div className="log-toolbar">
           <button className="btn" style={{background:'var(--bull-dim)',borderColor:'var(--bull)',color:'#fff',fontSize:12,display:'flex',alignItems:'center',gap:5}} onClick={() => TradeLog.exportExcel(log, tradeCapital, lev)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            Export Excel
+            Excel
+          </button>
+          <button className="btn" style={{fontSize:12,display:'flex',alignItems:'center',gap:5}} onClick={() => TradeLog.exportJSON(log)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            JSON
+          </button>
+          <button className="btn" style={{fontSize:12,color:'var(--accent)',display:'flex',alignItems:'center',gap:5}} onClick={() => fileRef.current?.click()}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            Import
           </button>
           <button className="btn" style={{fontSize:12}} onClick={() => setShowAll(!showAll)}>{showAll ? 'Show Recent' : `Show All (${log.length})`}</button>
           {log.length > 0 && <button className="btn" style={{fontSize:12,color:'var(--bear)'}} onClick={() => { if (confirm('Clear all logged signals? This cannot be undone.')) onClear(); }}>Clear Log</button>}
-          <span style={{fontSize:11,color:'var(--muted)',marginLeft:'auto'}}>Updates every 30s</span>
+          <span style={{fontSize:11,color:'var(--muted)',marginLeft:'auto'}}>Auto-saved + IndexedDB backup</span>
         </div>
 
         {displayed.length > 0 ? (
@@ -2118,7 +2279,14 @@ function TradeLogPanel({log, onClear, tradeCapital, userLev}) {
             </table>
           </div>
         ) : (
-          <div style={{textAlign:'center',color:'var(--muted)',padding:20}}>No signals logged yet. The scanner will auto-log setups as they appear.</div>
+          <div style={{textAlign:'center',color:'var(--muted)',padding:20}}>
+            <div>No signals logged yet. The scanner will auto-log setups as they appear.</div>
+            <div style={{marginTop:10}}>
+              <button className="btn" style={{color:'var(--accent)',fontSize:12}} onClick={() => fileRef.current?.click()}>
+                Import a previous session (JSON or Excel)
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -2178,8 +2346,13 @@ function App() {
   const bestSetups = useMemo(() => getBestSetups(scanResults), [scanResults]);
   const checks = useMemo(() => getScalpChecklist(scanResults, livePrice || (data?.ticker ? +data.ticker.lastPrice : 0)), [scanResults, livePrice, data]);
 
-  // Trade log state
+  // Trade log state — restore from IndexedDB if localStorage is empty
   const [tradeLogData, setTradeLogData] = useState(() => TradeLog.getAll());
+  useEffect(() => {
+    TradeLog.restore().then(log => {
+      if (log.length > 0 && tradeLogData.length === 0) setTradeLogData(log);
+    });
+  }, []);
 
   // Auto-log new setups and check outcomes on each data refresh
   useEffect(() => {
@@ -2198,6 +2371,9 @@ function App() {
   const handleClearLog = useCallback(() => {
     TradeLog.clear();
     setTradeLogData([]);
+  }, []);
+  const handleImport = useCallback(() => {
+    setTradeLogData(TradeLog.getAll());
   }, []);
 
   if (error) return (
@@ -2231,7 +2407,7 @@ function App() {
           <QuickReference />
         </div>
       </div>
-      <TradeLogPanel log={tradeLogData} onClear={handleClearLog} tradeCapital={tradeCapital} userLev={userLev} />
+      <TradeLogPanel log={tradeLogData} onClear={handleClearLog} onImport={handleImport} tradeCapital={tradeCapital} userLev={userLev} />
       <div className="footer">
         BTC Scalp Lab — Real-time scalp trading education & signals. Data from Binance. Refreshes every {REFRESH_MS/1000}s.
         <br/>Not financial advice. Trade at your own risk. <a href="index.html" style={{color:'var(--accent)'}}>Back to Signal Desk</a>
