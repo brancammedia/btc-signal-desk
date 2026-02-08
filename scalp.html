@@ -1237,7 +1237,9 @@ const TradeLog = {
     for (const s of setups) {
       dirVotes[s.dir] = (dirVotes[s.dir] || 0) + (tfRank[s.tf] || 1);
     }
-    const dominantDir = dirVotes.long >= dirVotes.short ? 'long' : 'short';
+    // Strict majority required — on tie, skip all signals (no directional bias)
+    const dominantDir = dirVotes.long > dirVotes.short ? 'long' : dirVotes.short > dirVotes.long ? 'short' : null;
+    if (!dominantDir) return 0; // conflicting directions, skip this cycle
 
     for (const s of setups) {
       if (s.conf < LOG_MIN_CONF) continue; // skip low-confidence signals
@@ -1362,7 +1364,8 @@ const TradeLog = {
     const losses = closed.filter(t => t.status === 'loss');
     const expired = closed.filter(t => t.status === 'expired');
     const totalPnl = closed.reduce((s, t) => s + (t.pnlPct || 0), 0);
-    const winRate = closed.length > 0 ? (wins.length / (wins.length + losses.length) * 100) : 0;
+    const decided = wins.length + losses.length + expired.length; // expired count as non-wins
+    const winRate = decided > 0 ? (wins.length / decided * 100) : 0;
     const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnlPct, 0) / wins.length : 0;
     const avgLoss = losses.length > 0 ? losses.reduce((s, t) => s + t.pnlPct, 0) / losses.length : 0;
     return {total: closed.length, open: log.filter(t => t.status === 'open').length, wins: wins.length, losses: losses.length, expired: expired.length, totalPnl, winRate, avgWin, avgLoss};
