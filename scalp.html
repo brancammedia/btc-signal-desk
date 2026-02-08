@@ -1781,25 +1781,29 @@ function PositionSizer({tradeCapital, setTradeCapital, riskAmt, setRiskAmt, user
           ))}
         </div>
         <table>
-          <thead><tr><th>Leverage</th><th>Position</th><th>Risk %</th><th>Liq Price</th></tr></thead>
+          <thead><tr><th>Leverage</th><th>Position</th><th>SL Distance</th><th>Risk %</th><th>Liq Move</th></tr></thead>
           <tbody>
             {levOptions.map(lv => {
               const pos = tradeCapital * lv;
               const riskPct = pos > 0 ? (riskAmt / pos * 100) : 0;
+              const slDist = pos > 0 ? (riskAmt / pos * 100) : 0; // SL = Entry × (1 - this%)
               const liqPct = lv > 1 ? (1 / lv * 100).toFixed(1) : '—';
+              const active = lv === userLev;
               return (
-                <tr key={lv} style={{background: lv === userLev ? 'var(--accent-bg)' : 'transparent'}}>
-                  <td className={lv === userLev ? 'accent' : 'text'}>{lv}x</td>
+                <tr key={lv} style={{background: active ? 'var(--accent-bg)' : 'transparent', cursor:'pointer'}} onClick={() => setUserLev(lv)}>
+                  <td style={{fontWeight: active ? 700 : 400, color: active ? 'var(--accent)' : 'var(--dim)'}}>{lv}x{active ? ' *' : ''}</td>
                   <td>${pos.toLocaleString()}</td>
+                  <td style={{color: slDist < 0.2 ? 'var(--bear)' : slDist < 0.5 ? 'var(--warn)' : 'var(--text)'}}>{slDist.toFixed(2)}%</td>
                   <td>{riskPct.toFixed(2)}%</td>
-                  <td>{liqPct}%</td>
+                  <td style={{color:'var(--warn)'}}>{liqPct}{liqPct !== '—' ? '%' : ''}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-        <div style={{fontSize:11,color:'var(--muted)',marginTop:8}}>
-          Position = Capital x Leverage. SL adjusts automatically: higher leverage = tighter stop for same risk.
+        <div style={{fontSize:11,color:'var(--muted)',marginTop:8,lineHeight:1.6}}>
+          <strong>SL Distance</strong> = how far your stop is from entry (% move). Higher leverage = tighter stop.
+          <br/>Formula: <span style={{fontFamily:'JetBrains Mono,monospace',color:'var(--accent)'}}>SL = Entry × (1 ± MaxLoss / Position)</span>
         </div>
       </div>
     </div>
