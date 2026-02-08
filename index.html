@@ -78,7 +78,10 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
 .glow-bear{box-shadow:0 0 25px rgba(239,68,68,0.15),0 0 50px rgba(239,68,68,0.05);border-color:var(--bear-dim)!important;}
 
 /* Session indicator */
-.session-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;}
+.session-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.session-pill{display:flex;align-items:center;gap:5px;background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:10px;white-space:nowrap;}
+.session-pill .s-name{font-weight:600;min-width:28px;}
+.session-pill .s-timer{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:-0.3px;}
 
 /* Tabs */
 .tabs{display:flex;gap:2px;padding:4px;background:var(--card2);border-radius:6px;margin-bottom:8px;}
@@ -135,7 +138,10 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
 
 /* Responsive */
 @media(max-width:768px){
-  .header{padding:8px 12px;font-size:13px;}
+  .header{padding:8px 10px;font-size:13px;gap:6px;}
+  .session-pill{padding:2px 6px;font-size:9px;}
+  .session-pill .s-name{min-width:auto;font-size:9px;}
+  .session-pill .s-timer{font-size:8px;}
   .main-grid{display:flex!important;flex-direction:column;padding:8px;gap:8px;}
   .col-left,.col-right{display:contents!important;}
   .card-body{padding:8px 10px;}
@@ -1277,12 +1283,12 @@ function Header({livePrice, change24h, lastRefresh, onRefresh}) {
           {change24h >= 0 ? '+' : ''}{change24h.toFixed(2)}%
         </span>
       )}
-      <div style={{display:'flex',gap:10,alignItems:'center',marginLeft:8,flexWrap:'wrap'}}>
+      <div style={{display:'flex',gap:4,alignItems:'center',marginLeft:4}}>
         {sessionInfo.map(s => (
-          <div key={s.name} style={{display:'flex',alignItems:'center',gap:4,fontSize:10}}>
-            <span className="session-dot" style={{background: s.isOpen ? s.color : 'var(--border2)', boxShadow: s.isOpen ? `0 0 6px ${s.color}` : 'none'}}></span>
-            <span style={{color: s.isOpen ? s.color : 'var(--muted)', fontWeight: s.isOpen ? 600 : 400}}>{s.name}</span>
-            <span style={{color:'var(--muted)',fontSize:9,fontFamily:'JetBrains Mono'}}>{s.label} {s.countdown}</span>
+          <div key={s.name} className="session-pill" style={s.isOpen ? {borderColor: s.color + '44'} : {}}>
+            <span className="session-dot" style={{background: s.isOpen ? s.color : 'var(--border2)', boxShadow: s.isOpen ? `0 0 5px ${s.color}` : 'none'}}></span>
+            <span className="s-name" style={{color: s.isOpen ? s.color : 'var(--muted)'}}>{s.name}</span>
+            <span className="s-timer">{s.label} {s.countdown}</span>
           </div>
         ))}
       </div>
