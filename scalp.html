@@ -193,6 +193,16 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
   .badge{font-size:10px;padding:2px 6px;}
   .card-head{font-size:13px;padding:6px 10px;}
   .sub-h{font-size:11px;}
+  .card-body{padding:8px!important;}
+  table{font-size:10px!important;}
+  td,th{padding:2px 4px!important;}
+  .log-stats{gap:4px;}
+  .log-stat{min-width:50px;padding:4px 6px;}
+  .log-stat .val{font-size:14px;}
+  .scanner-grid{grid-template-columns:1fr repeat(4,36px);font-size:10px;}
+  .info-bubble-fixed{width:180px;font-size:10px;}
+  .input{width:100%;font-size:12px;}
+  .session-pill .s-timer{display:none;}
 }
 </style>
 </head>
@@ -409,7 +419,7 @@ const Ind = {
   },
   // Compute all indicators for a set of candles
   computeAll(candles) {
-    if (!candles || candles.length < 30) return null;
+    if (!candles || candles.length < 50) return null;
     const closes = candles.map(c => c.close);
     const ema9 = this.ema(closes, 9), ema21 = this.ema(closes, 21), ema50 = this.ema(closes, 50);
     const rsi = this.rsi(closes, 14);
@@ -604,8 +614,8 @@ const STRATEGIES = [
       const bearCross = ind.ema9[P] >= ind.ema21[P] && ind.ema9[L] < ind.ema21[L];
       const aboveEma50 = ind.ema50[L] && price > ind.ema50[L];
       const belowEma50 = ind.ema50[L] && price < ind.ema50[L];
-      const macdBull = ind.macd.hist[L] > 0 || (ind.macd.hist[L] > ind.macd.hist[P]);
-      const macdBear = ind.macd.hist[L] < 0 || (ind.macd.hist[L] < ind.macd.hist[P]);
+      const macdBull = ind.macd.hist[L] > 0 && ind.macd.hist[L] > ind.macd.hist[P];
+      const macdBear = ind.macd.hist[L] < 0 && ind.macd.hist[L] < ind.macd.hist[P];
       if (bullCross && aboveEma50 && macdBull) {
         return {dir:'long', conf:70, entry:price, sl:ind.ema21[L] - atr * 0.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'9 EMA crossed above 21 EMA with price above 50 EMA — bullish momentum'};
       }
@@ -741,13 +751,13 @@ const STRATEGIES = [
       if (!ind.stochRsi.k[L] || !ind.stochRsi.d[L] || !ind.stochRsi.k[P] || !ind.stochRsi.d[P] || !ind.atr[L]) return null;
       const kL = ind.stochRsi.k[L], dL = ind.stochRsi.d[L], kP = ind.stochRsi.k[P], dP = ind.stochRsi.d[P];
       const price = candles[L].close, atr = ind.atr[L];
-      // Bull: K crossed above D in oversold
-      if (kP <= dP && kL > dL && kL < 30) {
-        return {dir:'long', conf:65, entry:price, sl:price - atr * 1.0, tp1:price + atr * 1.2, tp2:price + atr * 2.0, reason:'StochRSI bullish cross in oversold territory'};
+      // Bull: K crossed above D in deep oversold (< 20)
+      if (kP <= dP && kL > dL && kL < 20 && candles[L].close > candles[L].open) {
+        return {dir:'long', conf:65, entry:price, sl:price - atr * 1.0, tp1:price + atr * 1.2, tp2:price + atr * 2.0, reason:'StochRSI bullish cross in deep oversold (K < 20) with bull candle'};
       }
-      // Bear: K crossed below D in overbought
-      if (kP >= dP && kL < dL && kL > 70) {
-        return {dir:'short', conf:65, entry:price, sl:price + atr * 1.0, tp1:price - atr * 1.2, tp2:price - atr * 2.0, reason:'StochRSI bearish cross in overbought territory'};
+      // Bear: K crossed below D in deep overbought (> 80)
+      if (kP >= dP && kL < dL && kL > 80 && candles[L].close < candles[L].open) {
+        return {dir:'short', conf:65, entry:price, sl:price + atr * 1.0, tp1:price - atr * 1.2, tp2:price - atr * 2.0, reason:'StochRSI bearish cross in deep overbought (K > 80) with bear candle'};
       }
       return null;
     }
@@ -782,10 +792,10 @@ const STRATEGIES = [
         }
         if (tested) continue;
         if (ob.type === 'bull' && candles[L].close > candles[L].open) {
-          return {dir:'long', conf:78, entry:price, sl:ob.bottom - atr * 0.3, tp1:price + atr * 2, tp2:price + atr * 3, reason:'Price reacting at fresh bullish Order Block — institutional buy zone'};
+          return {dir:'long', conf:78, entry:price, sl:ob.bottom - atr * 0.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price reacting at fresh bullish Order Block — institutional buy zone'};
         }
         if (ob.type === 'bear' && candles[L].close < candles[L].open) {
-          return {dir:'short', conf:78, entry:price, sl:ob.top + atr * 0.3, tp1:price - atr * 2, tp2:price - atr * 3, reason:'Price reacting at fresh bearish Order Block — institutional sell zone'};
+          return {dir:'short', conf:78, entry:price, sl:ob.top + atr * 0.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price reacting at fresh bearish Order Block — institutional sell zone'};
         }
       }
       return null;
@@ -881,23 +891,27 @@ const STRATEGIES = [
       if (L < 10 || !ind.atr[L]) return null;
       const price = candles[L].close, atr = ind.atr[L];
       const {highs, lows} = smc.swings;
+      // Volume confirmation: current candle volume above 20-bar average
+      const vols = candles.slice(-20).map(c => c.volume);
+      const avgVol = vols.reduce((a, b) => a + b, 0) / vols.length;
+      const hasVolume = candles[L].volume > avgVol * 1.2;
       // Check if last candle swept a recent high and rejected
       for (const hi of highs.slice(-5).reverse()) {
-        if (hi.i > L - 3) continue;
+        if (hi.i > L - 3 || hi.i < L - 15) continue; // swing must be 3-15 bars ago
         if (candles[L].high > hi.price && candles[L].close < hi.price) {
           const wickRatio = (candles[L].high - candles[L].close) / (candles[L].high - candles[L].low);
-          if (wickRatio > 0.5) {
-            return {dir:'short', conf:80, entry:price, sl:candles[L].high + atr * 0.2, tp1:price - atr * 2, tp2:price - atr * 3, reason:'Liquidity sweep of swing high — wick rejected above level, reversal expected'};
+          if (wickRatio > 0.6 && hasVolume) {
+            return {dir:'short', conf:72, entry:price, sl:candles[L].high + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Liquidity sweep of swing high — strong wick rejection with volume, reversal expected'};
           }
         }
       }
       // Check if last candle swept a recent low and rejected
       for (const lo of lows.slice(-5).reverse()) {
-        if (lo.i > L - 3) continue;
+        if (lo.i > L - 3 || lo.i < L - 15) continue; // swing must be 3-15 bars ago
         if (candles[L].low < lo.price && candles[L].close > lo.price) {
           const wickRatio = (candles[L].close - candles[L].low) / (candles[L].high - candles[L].low);
-          if (wickRatio > 0.5) {
-            return {dir:'long', conf:80, entry:price, sl:candles[L].low - atr * 0.2, tp1:price + atr * 2, tp2:price + atr * 3, reason:'Liquidity sweep of swing low — wick rejected below level, reversal expected'};
+          if (wickRatio > 0.6 && hasVolume) {
+            return {dir:'long', conf:72, entry:price, sl:candles[L].low - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Liquidity sweep of swing low — strong wick rejection with volume, reversal expected'};
           }
         }
       }
@@ -959,17 +973,18 @@ const STRATEGIES = [
       const c = candles[L], p = candles[P], price = c.close, atr = ind.atr[L];
       const cBody = Math.abs(c.close - c.open), pBody = Math.abs(p.close - p.open);
       const cRange = c.high - c.low;
+      const minBody = atr * 0.1; // minimum body size to avoid noise
       // Bullish engulfing
-      const bullEngulf = c.close > c.open && p.close < p.open && c.close > p.open && c.open < p.close && cBody > pBody * 1.2;
+      const bullEngulf = c.close > c.open && p.close < p.open && c.close > p.open && c.open < p.close && cBody > pBody * 1.2 && cBody > minBody;
       // Bearish engulfing
-      const bearEngulf = c.close < c.open && p.close > p.open && c.close < p.open && c.open > p.close && cBody > pBody * 1.2;
-      // Pin bar / hammer (long lower wick)
+      const bearEngulf = c.close < c.open && p.close > p.open && c.close < p.open && c.open > p.close && cBody > pBody * 1.2 && cBody > minBody;
+      // Pin bar / hammer (long lower wick) — require meaningful body
       const lowerWick = Math.min(c.open, c.close) - c.low;
       const upperWick = c.high - Math.max(c.open, c.close);
-      const bullPin = lowerWick > cBody * 2 && upperWick < cBody * 0.5 && cRange > 0;
-      const bearPin = upperWick > cBody * 2 && lowerWick < cBody * 0.5 && cRange > 0;
-      // Check if at a key level (VWAP or EMA)
-      const nearVwap = ind.vwap[L] && Math.abs(price - ind.vwap[L]) / price < 0.003;
+      const bullPin = cBody > minBody && lowerWick > cBody * 2.5 && upperWick < cBody * 0.3 && cRange > atr * 0.3;
+      const bearPin = cBody > minBody && upperWick > cBody * 2.5 && lowerWick < cBody * 0.3 && cRange > atr * 0.3;
+      // Check if at a key level (VWAP or EMA) — tightened proximity
+      const nearVwap = ind.vwap[L] && Math.abs(price - ind.vwap[L]) / price < 0.002;
       const nearEma = (ind.ema21[L] && Math.abs(price - ind.ema21[L]) / price < 0.002) || (ind.ema50[L] && Math.abs(price - ind.ema50[L]) / price < 0.002);
       const atLevel = nearVwap || nearEma;
       if (bullEngulf && atLevel) return {dir:'long', conf:67, entry:price, sl:c.low - atr * 0.2, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish engulfing at key level — buyers overwhelmed sellers'};
@@ -1000,10 +1015,10 @@ const STRATEGIES = [
       const recentCHOCH = smc.signals.filter(s => s.type === 'CHOCH' && s.i > L - 20 && s.i < L - 1);
       for (const ch of recentCHOCH.reverse()) {
         if (ch.dir === 'bull' && candles[L].close > candles[L].open && price < ch.price * 1.005) {
-          return {dir:'long', conf:77, entry:price, sl:price - atr * 1.5, tp1:ch.price, tp2:ch.price + atr * 2, reason:'Bullish CHOCH detected — trend reversal to upside, entering on pullback'};
+          return {dir:'long', conf:77, entry:price, sl:price - atr * 1.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish CHOCH detected — trend reversal to upside, entering on pullback'};
         }
         if (ch.dir === 'bear' && candles[L].close < candles[L].open && price > ch.price * 0.995) {
-          return {dir:'short', conf:77, entry:price, sl:price + atr * 1.5, tp1:ch.price, tp2:ch.price - atr * 2, reason:'Bearish CHOCH detected — trend reversal to downside, entering on pullback'};
+          return {dir:'short', conf:77, entry:price, sl:price + atr * 1.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish CHOCH detected — trend reversal to downside, entering on pullback'};
         }
       }
       return null;
@@ -1018,7 +1033,7 @@ function scanAll(allCandles) {
   const results = {};
   for (const tf of TIMEFRAMES) {
     const candles = allCandles[tf];
-    if (!candles || candles.length < 30) continue;
+    if (!candles || candles.length < 50) continue;
     const ind = Ind.computeAll(candles);
     if (!ind) continue;
     const smc = SMC.analyze(candles);
@@ -1325,8 +1340,10 @@ const TradeLog = {
         }
       }
 
-      // Time-based expiry: if open > 4 hours, expire it
-      if (t.status === 'open' && (Date.now() - t.openTime) > 4 * 60 * 60 * 1000) {
+      // Time-based expiry: varies by timeframe (1m:30min, 5m:2h, 15m:4h, 1h:8h)
+      const expiryMs = {'1m':30*60*1000, '5m':2*60*60*1000, '15m':4*60*60*1000, '1h':8*60*60*1000};
+      const maxAge = expiryMs[t.tf] || 4 * 60 * 60 * 1000;
+      if (t.status === 'open' && (Date.now() - t.openTime) > maxAge) {
         const lastCandle = candles1m[candles1m.length - 1];
         const curPrice = lastCandle ? lastCandle.close : t.entry;
         t.status = 'expired';
