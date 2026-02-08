@@ -1661,6 +1661,53 @@ function QuickReference() {
           </tbody>
         </table>
 
+        <div className="sub-h">Optimal Trade Entry (OTE) — Fibonacci Zone</div>
+        <table style={{marginBottom:12}}>
+          <thead><tr><th>Fib Level</th><th>Zone</th><th>Use</th></tr></thead>
+          <tbody>
+            <tr><td className="text">0% (swing end)</td><td>Target</td><td>Take profit zone — where the swing ended</td></tr>
+            <tr><td className="text">38.2%</td><td>Shallow pullback</td><td>Aggressive entry, higher risk of deeper pull</td></tr>
+            <tr><td className="text">50%</td><td>Equilibrium</td><td>Fair value — decent entry if supported by a POI</td></tr>
+            <tr><td className="bull">61.8%</td><td className="bull">OTE Start</td><td className="bull">Golden ratio — primary OTE entry zone begins</td></tr>
+            <tr><td className="bull">70.5%</td><td className="bull">OTE Sweet Spot</td><td className="bull">Optimal entry — highest probability within OTE</td></tr>
+            <tr><td className="bull">78.6%</td><td className="bull">OTE End</td><td className="bull">Deep OTE — tight SL, best R:R if it holds</td></tr>
+            <tr><td className="bear">100% (swing start)</td><td className="bear">Invalidation</td><td className="bear">If price returns here, the setup has failed</td></tr>
+          </tbody>
+        </table>
+        <div style={{fontSize:11,color:'var(--dim)',marginBottom:12,lineHeight:1.6}}>
+          <strong style={{color:'var(--accent)'}}>How to use:</strong> After a BOS, draw Fibonacci from swing low to swing high. The OTE zone (61.8%-78.6%) is where institutional orders cluster. Enter longs here with SL below 79%. If an OB or FVG sits within the OTE zone, that is the highest confluence entry possible.
+        </div>
+
+        <div className="sub-h">Multi-Timeframe Alignment (1H → 15m → 5m)</div>
+        <table style={{marginBottom:12}}>
+          <thead><tr><th>Step</th><th>Timeframe</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td className="accent">1. Direction</td><td className="text">1H</td><td>Determine trend (HH/HL or LH/LL). Only trade with this direction.</td></tr>
+            <tr><td className="accent">2. Key Levels</td><td className="text">1H</td><td>Mark unmitigated OBs, FVGs, and liquidity targets on 1H.</td></tr>
+            <tr><td className="accent">3. Confirmation</td><td className="text">15m</td><td>Wait for 15m BOS/CHOCH/displacement at a 1H level.</td></tr>
+            <tr><td className="accent">4. Entry</td><td className="text">5m</td><td>Enter at 15m OB/FVG on the pullback with 5m confirmation candle.</td></tr>
+          </tbody>
+        </table>
+        <div style={{fontSize:11,color:'var(--warn)',marginBottom:12,lineHeight:1.6}}>
+          <strong>Rule:</strong> Never take a 5m trade that contradicts the 1H narrative. A beautiful 5m OB inside a 1H bearish FVG will get destroyed.
+        </div>
+
+        <div className="sub-h">AMD Cycle (Accumulation → Manipulation → Distribution)</div>
+        <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:140,background:'var(--accent-bg)',borderRadius:6,padding:8,border:'1px solid var(--accent-dim)'}}>
+            <div style={{fontWeight:600,fontSize:11,color:'var(--accent)'}}>ACCUMULATION</div>
+            <div style={{fontSize:11,color:'var(--dim)',marginTop:3}}>Asia session range. Price consolidates. Mark the high and low.</div>
+          </div>
+          <div style={{flex:1,minWidth:140,background:'var(--bear-bg)',borderRadius:6,padding:8,border:'1px solid var(--bear-dim)'}}>
+            <div style={{fontWeight:600,fontSize:11,color:'var(--bear)'}}>MANIPULATION</div>
+            <div style={{fontSize:11,color:'var(--dim)',marginTop:3}}>London open sweeps one side (fake breakout). Stops triggered, liquidity grabbed.</div>
+          </div>
+          <div style={{flex:1,minWidth:140,background:'var(--bull-bg)',borderRadius:6,padding:8,border:'1px solid var(--bull-dim)'}}>
+            <div style={{fontWeight:600,fontSize:11,color:'var(--bull)'}}>DISTRIBUTION</div>
+            <div style={{fontSize:11,color:'var(--dim)',marginTop:3}}>Real move begins in opposite direction. This is your trade. Ride London/NY trend.</div>
+          </div>
+        </div>
+
         <div className="sub-h">Entry Checklist (Before Every Trade)</div>
         <ol style={{paddingLeft:20,fontSize:12,lineHeight:2,color:'var(--dim)'}}>
           <li>What is the <strong style={{color:'var(--text)'}}>1H trend</strong>? (Only trade with it)</li>
