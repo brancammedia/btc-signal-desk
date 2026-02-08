@@ -169,6 +169,7 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
   .m-tvChart{order:9!important;}
   .m-journal{order:10!important;}
   .m-levels{order:11!important;}
+  .m-siglog{order:12!important;}
 }
 @media(max-width:480px){
   .header h1{font-size:16px!important;}
@@ -2056,6 +2057,280 @@ function EntryTiming({setup}) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SIGNAL PERFORMANCE LOG — auto-tracks setup outcomes
+// ═══════════════════════════════════════════════════════════════
+const SIG_LOG_KEY = 'btc-signal-log';
+const SIG_IDB_NAME = 'SignalDeskDB';
+const SIG_IDB_STORE = 'signalLog';
+const SIG_DEDUP_MS = 60 * 60 * 1000; // 1h dedup for main app (setups are slower-moving)
+
+const SignalLog = {
+  _load() { try { return JSON.parse(localStorage.getItem(SIG_LOG_KEY)) || []; } catch { return []; } },
+  _save(log) {
+    try { localStorage.setItem(SIG_LOG_KEY, JSON.stringify(log)); } catch {}
+    this._saveIDB(log);
+  },
+  _openIDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(SIG_IDB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(SIG_IDB_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  },
+  async _saveIDB(log) { try { const db = await this._openIDB(); const tx = db.transaction(SIG_IDB_STORE,'readwrite'); tx.objectStore(SIG_IDB_STORE).put(log,'trades'); } catch {} },
+  async _loadIDB() { try { const db = await this._openIDB(); return new Promise(r => { const req = db.transaction(SIG_IDB_STORE,'readonly').objectStore(SIG_IDB_STORE).get('trades'); req.onsuccess = () => r(req.result||[]); req.onerror = () => r([]); }); } catch { return []; } },
+  async restore() { let log = this._load(); if (log.length > 0) return log; log = await this._loadIDB(); if (log.length > 0) this._save(log); return log; },
+  getAll() { return this._load(); },
+  clear() { this._save([]); },
+
+  logSetup(setup, composite) {
+    if (!setup || !setup.entry) return 0;
+    const log = this._load();
+    const now = Date.now();
+    // Dedup: same direction within dedup window
+    const isDup = log.some(t => t.dir === setup.direction.toLowerCase() && t.status === 'open' && (now - t.openTime) < SIG_DEDUP_MS);
+    if (isDup) return 0;
+    log.push({
+      id: now + '_' + Math.random().toString(36).slice(2, 7),
+      dir: setup.direction.toLowerCase(),
+      conf: setup.confidence || 0,
+      composite: composite?.score || 0,
+      signal: composite?.signal || '',
+      entry: setup.entry,
+      sl: setup.sl,
+      tp1: setup.tps?.[0]?.price || 0,
+      tp2: setup.tps?.[1]?.price || 0,
+      tp3: setup.tps?.[2]?.price || 0,
+      techSl: setup.techSl || setup.sl,
+      lev: setup.lev || 1,
+      openTime: now,
+      status: 'open',
+      closeTime: null, closePrice: null, pnlPct: null, tp1Hit: false,
+    });
+    this._save(log);
+    return 1;
+  },
+
+  checkOutcomes(candles15m) {
+    if (!candles15m || candles15m.length < 2) return;
+    const log = this._load();
+    let changed = false;
+    for (const t of log) {
+      if (t.status !== 'open' && t.status !== 'win-tp1' && t.status !== 'win-tp2') continue;
+      const isLong = t.dir === 'long';
+      const relevantCandles = candles15m.filter(c => c.time >= t.openTime);
+      if (relevantCandles.length === 0) continue;
+      for (const c of relevantCandles) {
+        const slHit = isLong ? c.low <= t.sl : c.high >= t.sl;
+        const tp1Hit = isLong ? c.high >= t.tp1 : c.low <= t.tp1;
+        const tp2Hit = isLong ? c.high >= t.tp2 : c.low <= t.tp2;
+        const tp3Hit = t.tp3 && (isLong ? c.high >= t.tp3 : c.low <= t.tp3);
+        if (t.status === 'open') {
+          if (slHit) { t.status='loss'; t.closeTime=c.time; t.closePrice=t.sl; t.pnlPct=isLong?((t.sl-t.entry)/t.entry)*100:((t.entry-t.sl)/t.entry)*100; changed=true; break; }
+          if (tp1Hit) { t.tp1Hit=true; if (tp2Hit) { if (tp3Hit) { t.status='win-tp3'; t.closeTime=c.time; t.closePrice=t.tp3; t.pnlPct=isLong?((t.tp3-t.entry)/t.entry)*100:((t.entry-t.tp3)/t.entry)*100; } else { t.status='win-tp2'; t.closeTime=c.time; t.closePrice=t.tp2; t.pnlPct=isLong?((t.tp2-t.entry)/t.entry)*100:((t.entry-t.tp2)/t.entry)*100; } changed=true; break; } t.status='win-tp1'; t.closeTime=c.time; t.closePrice=t.tp1; t.pnlPct=isLong?((t.tp1-t.entry)/t.entry)*100:((t.entry-t.tp1)/t.entry)*100; changed=true; }
+        }
+        if (t.status === 'win-tp1') {
+          const beSlHit = isLong ? c.low <= t.entry : c.high >= t.entry;
+          if (tp2Hit) { if (tp3Hit) { t.status='win-tp3'; t.closeTime=c.time; t.closePrice=t.tp3; t.pnlPct=isLong?((t.tp3-t.entry)/t.entry)*100:((t.entry-t.tp3)/t.entry)*100; } else { t.status='win-tp2'; t.closeTime=c.time; t.closePrice=t.tp2; t.pnlPct=isLong?((t.tp2-t.entry)/t.entry)*100:((t.entry-t.tp2)/t.entry)*100; } changed=true; break; }
+          if (beSlHit && !tp2Hit) break;
+        }
+        if (t.status === 'win-tp2' && t.tp3) {
+          const beSlHit = isLong ? c.low <= t.tp1 : c.high >= t.tp1;
+          if (tp3Hit) { t.status='win-tp3'; t.closeTime=c.time; t.closePrice=t.tp3; t.pnlPct=isLong?((t.tp3-t.entry)/t.entry)*100:((t.entry-t.tp3)/t.entry)*100; changed=true; break; }
+          if (beSlHit) break;
+        }
+      }
+      // Expiry: 24h for main app setups (longer TFs)
+      if (t.status === 'open' && (Date.now() - t.openTime) > 24 * 60 * 60 * 1000) {
+        const lastC = candles15m[candles15m.length - 1];
+        t.status='expired'; t.closeTime=Date.now(); t.closePrice=lastC?lastC.close:t.entry;
+        t.pnlPct=isLong?((t.closePrice-t.entry)/t.entry)*100:((t.entry-t.closePrice)/t.entry)*100; changed=true;
+      }
+    }
+    if (changed) this._save(log);
+  },
+
+  getStats(log) {
+    const closed = log.filter(t => t.status !== 'open');
+    const wins = closed.filter(t => t.status.startsWith('win'));
+    const losses = closed.filter(t => t.status === 'loss');
+    const expired = closed.filter(t => t.status === 'expired');
+    const decided = wins.length + losses.length + expired.length;
+    const totalPnl = closed.reduce((s,t) => s + (t.pnlPct||0), 0);
+    return { total:closed.length, open:log.filter(t=>t.status==='open').length, wins:wins.length, losses:losses.length, expired:expired.length, totalPnl, winRate: decided > 0 ? wins.length/decided*100 : 0, avgWin: wins.length>0 ? wins.reduce((s,t)=>s+t.pnlPct,0)/wins.length : 0, avgLoss: losses.length>0 ? losses.reduce((s,t)=>s+t.pnlPct,0)/losses.length : 0 };
+  },
+
+  exportJSON(log) { const blob = new Blob([JSON.stringify(log,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`signal-log-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(a.href); },
+  importJSON(jsonStr) { try { const imp=JSON.parse(jsonStr); if(!Array.isArray(imp)) return{added:0,error:'Invalid format'}; return this._merge(imp); } catch(e){return{added:0,error:e.message};} },
+  _merge(imported) {
+    const log = this._load();
+    const keys = new Set(log.map(t => `${t.openTime}_${t.dir}`));
+    let added = 0;
+    for (const t of imported) { const k=`${t.openTime}_${t.dir}`; if(keys.has(k)) continue; log.push(t); added++; }
+    if (added > 0) { log.sort((a,b)=>a.openTime-b.openTime); this._save(log); }
+    return {added, total: log.length};
+  },
+
+  exportExcel(log, tradeCapital, lev) {
+    const posUSD = (tradeCapital||0) * Math.max(1,lev||1);
+    const rows = log.map(t => {
+      let dollarPnl = '—';
+      if (t.pnlPct != null && t.entry && posUSD > 0) {
+        const posBTC = posUSD / t.entry;
+        const priceDiff = t.closePrice ? Math.abs(t.closePrice - t.entry) : 0;
+        dollarPnl = ((t.pnlPct >= 0 ? 1 : -1) * posBTC * priceDiff).toFixed(2);
+      }
+      return { 'Time':new Date(t.openTime).toLocaleString(), 'Direction':t.dir.toUpperCase(), 'Confidence':t.conf+'%', 'Composite':t.composite, 'Signal':t.signal, 'Entry':t.entry?.toFixed(2), 'SL':t.sl?.toFixed(2), 'TP1':t.tp1?.toFixed(2), 'TP2':t.tp2?.toFixed(2), 'TP3':t.tp3?.toFixed(2), 'Status':t.status.toUpperCase(), 'Close Price':t.closePrice?.toFixed(2)||'—', 'P&L %':t.pnlPct!=null?t.pnlPct.toFixed(3)+'%':'—', '$ P&L':dollarPnl, 'Close Time':t.closeTime?new Date(t.closeTime).toLocaleString():'—' };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:18},{wch:8},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:10},{wch:12},{wch:18}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Signal Log');
+    XLSX.writeFile(wb, `signal-log-${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+};
+
+// ── Signal Performance Log Panel ──
+function SignalLogPanel({log, onClear, onImport, tradeCapital, userLev}) {
+  const [showAll, setShowAll] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [importMsg, setImportMsg] = useState(null);
+  const fileRef = useRef(null);
+  const lev = Math.max(1, userLev);
+  const posUSD = tradeCapital * lev;
+  const calcDollarPnl = (t) => {
+    if (t.pnlPct == null || !t.entry) return null;
+    const posBTC = posUSD / t.entry;
+    const priceDiff = t.closePrice ? Math.abs(t.closePrice - t.entry) : 0;
+    return (t.pnlPct >= 0 ? 1 : -1) * posBTC * priceDiff;
+  };
+  const stats = useMemo(() => {
+    const s = SignalLog.getStats(log);
+    const closed = log.filter(t => t.status !== 'open');
+    s.totalDollar = closed.reduce((sum, t) => sum + (calcDollarPnl(t)||0), 0);
+    // Breakdown by signal type
+    const bySignal = {};
+    for (const t of log) {
+      const key = t.signal || 'Unknown';
+      if (!bySignal[key]) bySignal[key] = {wins:0,losses:0,expired:0,open:0,totalPnl:0,totalDollar:0,count:0};
+      const b = bySignal[key]; b.count++;
+      if (t.status.startsWith('win')) { b.wins++; b.totalPnl+=t.pnlPct||0; b.totalDollar+=calcDollarPnl(t)||0; }
+      else if (t.status==='loss') { b.losses++; b.totalPnl+=t.pnlPct||0; b.totalDollar+=calcDollarPnl(t)||0; }
+      else if (t.status==='expired') { b.expired++; b.totalPnl+=t.pnlPct||0; b.totalDollar+=calcDollarPnl(t)||0; }
+      else b.open++;
+    }
+    s.bySignal = Object.entries(bySignal).map(([name,b]) => ({name,...b, winRate:(b.wins+b.losses+b.expired)>0?(b.wins/(b.wins+b.losses+b.expired)*100):null})).sort((a,b)=>(b.winRate||0)-(a.winRate||0));
+    // Confidence brackets
+    const byConf = {'80+':{w:0,l:0},'70-79':{w:0,l:0},'60-69':{w:0,l:0},'<60':{w:0,l:0}};
+    for (const t of closed) {
+      const bucket = t.conf>=80?'80+':t.conf>=70?'70-79':t.conf>=60?'60-69':'<60';
+      if (t.status.startsWith('win')) byConf[bucket].w++; else if (t.status==='loss') byConf[bucket].l++;
+    }
+    s.byConf = byConf;
+    return s;
+  }, [log, posUSD]);
+  const displayed = showAll ? log.slice().reverse() : log.slice().reverse().slice(0, 20);
+  const fmtTime = ts => { if (!ts) return '—'; const d=new Date(ts); return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' '+d.toLocaleDateString([],{month:'short',day:'numeric'}); };
+  const statusBadge = s => {
+    if (s==='win-tp1') return <span className="badge badge-bull" style={{fontSize:9}}>WIN TP1</span>;
+    if (s==='win-tp2') return <span className="badge badge-bull" style={{fontSize:9}}>WIN TP2</span>;
+    if (s==='win-tp3') return <span className="badge badge-bull" style={{fontSize:9}}>WIN TP3</span>;
+    if (s==='loss') return <span className="badge badge-bear" style={{fontSize:9}}>LOSS</span>;
+    if (s==='expired') return <span className="badge" style={{fontSize:9,background:'var(--warn-bg)',color:'var(--warn)'}}>EXPIRED</span>;
+    return <span className="badge" style={{fontSize:9}}>OPEN</span>;
+  };
+  const confBar = c => {
+    const color = c>=75?'var(--bull)':c>=65?'var(--accent)':'var(--warn)';
+    return <div style={{display:'flex',alignItems:'center',gap:4}}><span style={{fontSize:11,fontWeight:600,color,minWidth:28}}>{c}%</span><div style={{flex:1,height:4,borderRadius:2,background:'var(--border)',minWidth:30}}><div style={{width:`${c}%`,height:'100%',borderRadius:2,background:color}}/></div></div>;
+  };
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    if (file.name.endsWith('.json')) {
+      reader.onload = () => { const r=SignalLog.importJSON(reader.result); if(r.error) setImportMsg({type:'error',text:`Import failed: ${r.error}`}); else { setImportMsg({type:'ok',text:`Imported ${r.added} new signals (${r.total} total)`}); onImport(); } setTimeout(()=>setImportMsg(null),5000); };
+      reader.readAsText(file);
+    }
+    e.target.value = '';
+  };
+
+  return (
+    <div className="card bottom-panel">
+      <div className="card-head"><span>Signal Performance Log ({log.length} signals)</span><span style={{fontSize:11,color:'var(--muted)'}}>Auto-tracking</span></div>
+      <div className="card-body">
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:10}}>
+          <div className="journal-stat"><div className="val" style={{color:'var(--accent)'}}>{stats.open}</div><div className="lbl">Open</div></div>
+          <div className="journal-stat"><div className="val" style={{color:'var(--bull)'}}>{stats.wins}</div><div className="lbl">Wins</div></div>
+          <div className="journal-stat"><div className="val" style={{color:'var(--bear)'}}>{stats.losses}</div><div className="lbl">Losses</div></div>
+          <div className="journal-stat"><div className="val" style={{color:stats.winRate>=50?'var(--bull)':'var(--bear)'}}>{stats.winRate.toFixed(0)}%</div><div className="lbl">Win Rate</div></div>
+          <div className="journal-stat"><div className="val" style={{color:stats.totalPnl>=0?'var(--bull)':'var(--bear)'}}>{stats.totalPnl>=0?'+':''}{stats.totalPnl.toFixed(2)}%</div><div className="lbl">Total P&L</div></div>
+          <div className="journal-stat"><div className="val" style={{color:stats.totalDollar>=0?'var(--bull)':'var(--bear)',fontSize:18}}>{stats.totalDollar>=0?'+':''}${Math.abs(stats.totalDollar).toFixed(2)}</div><div className="lbl">Total $ P&L</div></div>
+          <div className="journal-stat"><div className="val bull">{stats.avgWin>0?'+':''}{stats.avgWin.toFixed(3)}%</div><div className="lbl">Avg Win</div></div>
+          <div className="journal-stat"><div className="val bear">{stats.avgLoss.toFixed(3)}%</div><div className="lbl">Avg Loss</div></div>
+        </div>
+        <div style={{fontSize:11,color:'var(--muted)',marginBottom:8}}>$ P&L based on ${tradeCapital.toLocaleString()} capital at {lev}x leverage (${posUSD.toLocaleString()} position)</div>
+
+        <button className="btn" style={{fontSize:11,marginBottom:8,color:'var(--accent)'}} onClick={()=>setShowBreakdown(!showBreakdown)}>{showBreakdown?'Hide':'Show'} Signal & Confidence Breakdown</button>
+        {showBreakdown && stats.bySignal && (
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--text)',marginBottom:6}}>Performance by Signal Type</div>
+            <div style={{overflowX:'auto'}}><table style={{fontSize:11}}><thead><tr><th>Signal</th><th>Signals</th><th>W</th><th>L</th><th>Exp</th><th>Win%</th><th>P&L %</th><th>$ P&L</th></tr></thead><tbody>
+              {stats.bySignal.map(b => (<tr key={b.name}><td style={{fontWeight:600}}>{b.name}</td><td>{b.count}</td><td className="bull">{b.wins}</td><td className="bear">{b.losses}</td><td style={{color:'var(--warn)'}}>{b.expired}</td><td style={{fontWeight:700,color:b.winRate==null?'var(--muted)':b.winRate>=50?'var(--bull)':'var(--bear)'}}>{b.winRate!=null?b.winRate.toFixed(0)+'%':'—'}</td><td className={b.totalPnl>=0?'bull':'bear'}>{b.totalPnl>=0?'+':''}{b.totalPnl.toFixed(3)}%</td><td className={b.totalDollar>=0?'bull':'bear'} style={{fontWeight:700}}>{b.totalDollar>=0?'+':'-'}${Math.abs(b.totalDollar).toFixed(2)}</td></tr>))}
+            </tbody></table></div>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--text)',margin:'12px 0 6px'}}>Win Rate by Confidence Level</div>
+            <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+              {Object.entries(stats.byConf).map(([bucket,d]) => { const total=d.w+d.l; const wr=total>0?(d.w/total*100).toFixed(0):'—'; return (
+                <div key={bucket} style={{background:'var(--card-bg)',border:'1px solid var(--border)',borderRadius:8,padding:'8px 14px',minWidth:100,textAlign:'center'}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--accent)'}}>{bucket}%</div>
+                  <div style={{fontSize:18,fontWeight:700,color:wr==='—'?'var(--muted)':Number(wr)>=50?'var(--bull)':'var(--bear)'}}>{wr}{wr!=='—'?'%':''}</div>
+                  <div style={{fontSize:10,color:'var(--muted)'}}>{d.w}W / {d.l}L ({total} trades)</div>
+                </div>); })}
+            </div>
+          </div>
+        )}
+
+        {importMsg && <div style={{padding:'8px 12px',marginBottom:8,borderRadius:6,fontSize:12,fontWeight:600,background:importMsg.type==='ok'?'var(--bull-bg)':'var(--bear-bg)',color:importMsg.type==='ok'?'var(--bull)':'var(--bear)',border:`1px solid ${importMsg.type==='ok'?'var(--bull)':'var(--bear)'}`}}>{importMsg.text}</div>}
+        <input type="file" ref={fileRef} accept=".json" style={{display:'none'}} onChange={handleImportFile} />
+        <div className="journal-toolbar" style={{marginBottom:10}}>
+          <button className="btn" style={{fontSize:11}} onClick={()=>SignalLog.exportExcel(log,tradeCapital,lev)}>Export Excel</button>
+          <button className="btn" style={{fontSize:11}} onClick={()=>SignalLog.exportJSON(log)}>Export JSON</button>
+          <button className="btn" style={{fontSize:11,color:'var(--accent)'}} onClick={()=>fileRef.current?.click()}>Import JSON</button>
+          <button className="btn" style={{fontSize:11}} onClick={()=>setShowAll(!showAll)}>{showAll?'Show Recent':`Show All (${log.length})`}</button>
+          {log.length>0 && <button className="btn" style={{fontSize:11,color:'var(--bear)'}} onClick={()=>{if(confirm('Clear all logged signals?'))onClear();}}>Clear</button>}
+          <span style={{fontSize:10,color:'var(--muted)',marginLeft:'auto'}}>Auto-saved + IndexedDB backup</span>
+        </div>
+
+        {displayed.length > 0 ? (
+          <div style={{overflowX:'auto'}}>
+            <table><thead><tr><th>Time</th><th>Dir</th><th>Conf</th><th>Score</th><th>Entry</th><th>SL</th><th>TP1</th><th>Status</th><th>P&L %</th><th>$ P&L</th></tr></thead>
+            <tbody>{displayed.map(t => {
+              const dp = calcDollarPnl(t);
+              return (<tr key={t.id} style={{background:t.status.startsWith('win')?'var(--bull-bg)':t.status==='loss'?'var(--bear-bg)':'transparent'}}>
+                <td style={{fontSize:10,whiteSpace:'nowrap'}}>{fmtTime(t.openTime)}</td>
+                <td><span className={`badge ${t.dir==='long'?'badge-bull':'badge-bear'}`} style={{fontSize:9}}>{t.dir.toUpperCase()}</span></td>
+                <td>{confBar(t.conf)}</td>
+                <td style={{fontWeight:600,color:t.composite>0?'var(--bull)':t.composite<0?'var(--bear)':'var(--muted)'}}>{t.composite>0?'+':''}{t.composite}</td>
+                <td>{fmtP(t.entry)}</td>
+                <td className="bear">{fmtP(t.sl)}</td>
+                <td className="bull">{fmtP(t.tp1)}</td>
+                <td>{statusBadge(t.status)}</td>
+                <td className={t.pnlPct>0?'bull':t.pnlPct<0?'bear':'muted'} style={{fontWeight:600}}>{t.pnlPct!=null?`${t.pnlPct>0?'+':''}${t.pnlPct.toFixed(3)}%`:'—'}</td>
+                <td className={dp>0?'bull':dp<0?'bear':'muted'} style={{fontWeight:700}}>{dp!=null?`${dp>0?'+':'-'}$${Math.abs(dp).toFixed(2)}`:'—'}</td>
+              </tr>);
+            })}</tbody></table>
+          </div>
+        ) : (
+          <div style={{textAlign:'center',color:'var(--muted)',padding:20}}>
+            <div>No signals logged yet. Auto-tracks setups as they appear.</div>
+            <div style={{marginTop:10}}><button className="btn" style={{color:'var(--accent)',fontSize:12}} onClick={()=>fileRef.current?.click()}>Import a previous session (JSON)</button></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Trade Journal ──
 const JOURNAL_COLS = ['Date','Direction','Entry','Stop Loss','TP1','TP2','TP3','Actual Exit','Outcome','P&L %','R:R Achieved','Confidence','Composite','Notes'];
 
@@ -2619,6 +2894,11 @@ function App() {
     setJournalTrades(trades);
     try { localStorage.setItem('btc_journal', JSON.stringify(trades)); } catch {}
   }, []);
+
+  // Signal performance log (auto-tracking)
+  const [signalLogData, setSignalLogData] = useState(() => SignalLog.getAll());
+  useEffect(() => { SignalLog.restore().then(log => { if (log.length > 0 && signalLogData.length === 0) setSignalLogData(log); }); }, []);
+
   const wsRef = useRef(null);
   const prevSetupRef = useRef(null);
   const prevCompositeRef = useRef(null);
@@ -2710,6 +2990,26 @@ function App() {
     return () => { if (wsRef.current) wsRef.current.close(); };
   }, [loading]);
 
+  // Auto-log setups to Signal Performance Log
+  useEffect(() => {
+    if (!setup) return;
+    const added = SignalLog.logSetup(setup, composite);
+    if (added) setSignalLogData(SignalLog.getAll());
+  }, [setup?.direction, setup?.entry, setup?.confidence]);
+
+  // Check signal outcomes on each data refresh (using 15m candles)
+  useEffect(() => {
+    const candles15m = allInd['15m']?.candles;
+    if (!candles15m || candles15m.length < 2) return;
+    const before = SignalLog.getAll();
+    SignalLog.checkOutcomes(candles15m);
+    const after = SignalLog.getAll();
+    if (JSON.stringify(before) !== JSON.stringify(after)) setSignalLogData(after);
+  }, [allInd['15m']?.candles?.length, lastRefresh]);
+
+  const handleClearSignalLog = useCallback(() => { SignalLog.clear(); setSignalLogData([]); }, []);
+  const handleImportSignalLog = useCallback(() => { setSignalLogData(SignalLog.getAll()); }, []);
+
   const change24h = ticker ? +ticker.priceChangePercent : null;
 
   if (loading) return (
@@ -2763,6 +3063,7 @@ function App() {
         <div className="m-history bottom-panel"><PriceHistoryChart allInd={allInd} /></div>
         <div className="m-tvChart bottom-panel"><TradingViewChart /></div>
         <div className="m-levels bottom-panel"><KeyLevelsPanel ind={allInd[selectedTF]} smc={allSmc[selectedTF]} /></div>
+        <div className="m-siglog bottom-panel"><SignalLogPanel log={signalLogData} onClear={handleClearSignalLog} onImport={handleImportSignalLog} tradeCapital={tradeCapital} userLev={userLev} /></div>
       </div>
 
       {/* FOOTER */}
