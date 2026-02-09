@@ -583,11 +583,19 @@ const STRATEGIES = [
       const stK = ind.stochRsi.k[L];
       if (candles[L].high >= upper2[L] && stK > 75) {
         const revCandle = candles[L].close < candles[L].open || (candles[L].high - candles[L].close) > (candles[L].close - candles[L].low) * 2;
-        if (revCandle) return {dir:'short', conf:68, entry:price, sl:upper2[L] + atr * 0.5, tp1:upper1[L], tp2:vwap[L], reason:'Price at upper 2σ VWAP band with overbought StochRSI — mean reversion short'};
+        if (revCandle) {
+          const sl = Math.max(upper2[L] + atr * 0.5, price + atr * 0.3);
+          if (upper1[L] >= price) return null; // TP1 must be below entry for shorts
+          return {dir:'short', conf:68, entry:price, sl, tp1:upper1[L], tp2:vwap[L], reason:'Price at upper 2σ VWAP band with overbought StochRSI — mean reversion short'};
+        }
       }
       if (candles[L].low <= lower2[L] && stK < 25) {
         const revCandle = candles[L].close > candles[L].open || (candles[L].close - candles[L].low) > (candles[L].high - candles[L].close) * 2;
-        if (revCandle) return {dir:'long', conf:68, entry:price, sl:lower2[L] - atr * 0.5, tp1:lower1[L], tp2:vwap[L], reason:'Price at lower 2σ VWAP band with oversold StochRSI — mean reversion long'};
+        if (revCandle) {
+          const sl = Math.min(lower2[L] - atr * 0.5, price - atr * 0.3);
+          if (lower1[L] <= price) return null; // TP1 must be above entry for longs
+          return {dir:'long', conf:68, entry:price, sl, tp1:lower1[L], tp2:vwap[L], reason:'Price at lower 2σ VWAP band with oversold StochRSI — mean reversion long'};
+        }
       }
       return null;
     }
@@ -792,10 +800,10 @@ const STRATEGIES = [
         }
         if (tested) continue;
         if (ob.type === 'bull' && candles[L].close > candles[L].open) {
-          return {dir:'long', conf:78, entry:price, sl:ob.bottom - atr * 0.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price reacting at fresh bullish Order Block — institutional buy zone'};
+          return {dir:'long', conf:68, entry:price, sl:ob.bottom - atr * 0.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price reacting at fresh bullish Order Block — institutional buy zone'};
         }
         if (ob.type === 'bear' && candles[L].close < candles[L].open) {
-          return {dir:'short', conf:78, entry:price, sl:ob.top + atr * 0.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price reacting at fresh bearish Order Block — institutional sell zone'};
+          return {dir:'short', conf:68, entry:price, sl:ob.top + atr * 0.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price reacting at fresh bearish Order Block — institutional sell zone'};
         }
       }
       return null;
@@ -858,14 +866,14 @@ const STRATEGIES = [
           const moveHigh = bos.price;
           const pullbackPct = (moveHigh - price) / (moveHigh - candles[bos.i - 3]?.low || price) || 0;
           if (pullbackPct > 0.3 && pullbackPct < 0.8 && candles[L].close > candles[L].open) {
-            return {dir:'long', conf:75, entry:price, sl:price - atr * 1.5, tp1:moveHigh, tp2:moveHigh + atr * 2, reason:'Bullish BOS pullback entry — structure broken, buying the retracement'};
+            return {dir:'long', conf:68, entry:price, sl:price - atr * 1.5, tp1:moveHigh, tp2:moveHigh + atr * 2, reason:'Bullish BOS pullback entry — structure broken, buying the retracement'};
           }
         }
         if (bos.dir === 'bear') {
           const moveLow = bos.price;
           const pullbackPct = (price - moveLow) / (candles[bos.i - 3]?.high - moveLow || price) || 0;
           if (pullbackPct > 0.3 && pullbackPct < 0.8 && candles[L].close < candles[L].open) {
-            return {dir:'short', conf:75, entry:price, sl:price + atr * 1.5, tp1:moveLow, tp2:moveLow - atr * 2, reason:'Bearish BOS pullback entry — structure broken, selling the retracement'};
+            return {dir:'short', conf:68, entry:price, sl:price + atr * 1.5, tp1:moveLow, tp2:moveLow - atr * 2, reason:'Bearish BOS pullback entry — structure broken, selling the retracement'};
           }
         }
       }
@@ -901,7 +909,7 @@ const STRATEGIES = [
         if (candles[L].high > hi.price && candles[L].close < hi.price) {
           const wickRatio = (candles[L].high - candles[L].close) / (candles[L].high - candles[L].low);
           if (wickRatio > 0.6 && hasVolume) {
-            return {dir:'short', conf:72, entry:price, sl:candles[L].high + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Liquidity sweep of swing high — strong wick rejection with volume, reversal expected'};
+            return {dir:'short', conf:65, entry:price, sl:candles[L].high + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Liquidity sweep of swing high — strong wick rejection with volume, reversal expected'};
           }
         }
       }
@@ -911,7 +919,7 @@ const STRATEGIES = [
         if (candles[L].low < lo.price && candles[L].close > lo.price) {
           const wickRatio = (candles[L].close - candles[L].low) / (candles[L].high - candles[L].low);
           if (wickRatio > 0.6 && hasVolume) {
-            return {dir:'long', conf:72, entry:price, sl:candles[L].low - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Liquidity sweep of swing low — strong wick rejection with volume, reversal expected'};
+            return {dir:'long', conf:65, entry:price, sl:candles[L].low - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Liquidity sweep of swing low — strong wick rejection with volume, reversal expected'};
           }
         }
       }
@@ -1029,6 +1037,9 @@ const STRATEGIES = [
 // ═══════════════════════════════════════════════════════════════
 // STRATEGY SCANNER — runs all strategies on all timeframes
 // ═══════════════════════════════════════════════════════════════
+// TF-strategy combos disabled based on performance data (net negative P&L with sufficient sample)
+const DISABLED_COMBOS = new Set(['bos-pullback:15m', 'ema-cross:15m']);
+
 function scanAll(allCandles) {
   const results = {};
   for (const tf of TIMEFRAMES) {
@@ -1039,9 +1050,18 @@ function scanAll(allCandles) {
     const smc = SMC.analyze(candles);
     results[tf] = {ind, smc, setups: []};
     for (const strat of STRATEGIES) {
+      if (DISABLED_COMBOS.has(`${strat.id}:${tf}`)) continue;
       try {
         const setup = strat.detect(ind, candles, smc);
-        if (setup) results[tf].setups.push({...setup, stratId: strat.id, stratName: strat.name, tf});
+        if (setup) {
+          // Safety: reject setups where SL is on the wrong side of entry
+          if (setup.dir === 'long' && setup.sl >= setup.entry) continue;
+          if (setup.dir === 'short' && setup.sl <= setup.entry) continue;
+          // Safety: reject setups where TP1 is on the wrong side of entry
+          if (setup.dir === 'long' && setup.tp1 <= setup.entry) continue;
+          if (setup.dir === 'short' && setup.tp1 >= setup.entry) continue;
+          results[tf].setups.push({...setup, stratId: strat.id, stratName: strat.name, tf});
+        }
       } catch {}
     }
   }
