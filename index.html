@@ -2069,7 +2069,7 @@ function EntryTiming({setup}) {
 const SIG_LOG_KEY = 'btc-signal-log';
 const SIG_IDB_NAME = 'SignalDeskDB';
 const SIG_IDB_STORE = 'signalLog';
-const SIG_DEDUP_MS = 60 * 60 * 1000; // 1h dedup for main app (setups are slower-moving)
+const SIG_MIN_CONF = 50; // minimum confidence to auto-log
 
 const SignalLog = {
   _load() { try { return JSON.parse(localStorage.getItem(SIG_LOG_KEY)) || []; } catch { return []; } },
@@ -2093,25 +2093,35 @@ const SignalLog = {
 
   logSetup(setup, composite) {
     if (!setup || !setup.entry) return 0;
+    // Reject low-confidence setups
+    if ((setup.confidence || 0) < SIG_MIN_CONF) return 0;
     const log = this._load();
-    const now = Date.now();
-    // Dedup: same direction within dedup window
-    const isDup = log.some(t => t.dir === setup.direction.toLowerCase() && t.status === 'open' && (now - t.openTime) < SIG_DEDUP_MS);
+    const dir = setup.direction.toLowerCase();
+    // Dedup: don't re-log if any open trade exists in the same direction
+    const isDup = log.some(t => t.dir === dir && t.status === 'open');
     if (isDup) return 0;
+    // SL clamping: if risk-based SL is >3x wider than technical SL, use tech SL + 50% buffer
+    let sl = setup.sl;
+    const techSl = setup.techSl || setup.sl;
+    const riskSlDist = Math.abs(sl - setup.entry);
+    const techSlDist = Math.abs(techSl - setup.entry);
+    if (techSlDist > 0 && riskSlDist > techSlDist * 3) {
+      sl = dir === 'long' ? setup.entry - techSlDist * 1.5 : setup.entry + techSlDist * 1.5;
+    }
     log.push({
-      id: now + '_' + Math.random().toString(36).slice(2, 7),
-      dir: setup.direction.toLowerCase(),
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      dir,
       conf: setup.confidence || 0,
       composite: composite?.score || 0,
       signal: composite?.signal || '',
       entry: setup.entry,
-      sl: setup.sl,
+      sl,
       tp1: setup.tps?.[0]?.price || 0,
       tp2: setup.tps?.[1]?.price || 0,
       tp3: setup.tps?.[2]?.price || 0,
-      techSl: setup.techSl || setup.sl,
+      techSl,
       lev: setup.lev || 1,
-      openTime: now,
+      openTime: Date.now(),
       status: 'open',
       closeTime: null, closePrice: null, pnlPct: null, tp1Hit: false,
     });

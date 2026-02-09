@@ -551,11 +551,11 @@ const STRATEGIES = [
       const bearTrend = ind.ema9[L] < ind.ema21[L];
       const rsi = ind.rsi[L];
       if (touchedVwap && bullCandle && bullTrend && rsi > 35 && rsi < 65) {
-        return {dir:'long', conf:72, entry:price, sl:vwap - atr, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price bounced off VWAP in uptrend with bullish candle confirmation'};
+        return {dir:'long', conf:60, entry:price, sl:vwap - atr, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price bounced off VWAP in uptrend with bullish candle confirmation'};
       }
       const touchedAbove = candles[L].high >= vwap * 0.998 && candles[L].high <= vwap * 1.002;
       if (touchedAbove && bearCandle && bearTrend && rsi > 35 && rsi < 65) {
-        return {dir:'short', conf:72, entry:price, sl:vwap + atr, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price rejected at VWAP in downtrend with bearish candle confirmation'};
+        return {dir:'short', conf:60, entry:price, sl:vwap + atr, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price rejected at VWAP in downtrend with bearish candle confirmation'};
       }
       return null;
     }
@@ -586,7 +586,7 @@ const STRATEGIES = [
         if (revCandle) {
           const sl = Math.max(upper2[L] + atr * 0.5, price + atr * 0.3);
           if (upper1[L] >= price) return null; // TP1 must be below entry for shorts
-          return {dir:'short', conf:68, entry:price, sl, tp1:upper1[L], tp2:vwap[L], reason:'Price at upper 2σ VWAP band with overbought StochRSI — mean reversion short'};
+          return {dir:'short', conf:62, entry:price, sl, tp1:upper1[L], tp2:vwap[L], reason:'Price at upper 2σ VWAP band with overbought StochRSI — mean reversion short'};
         }
       }
       if (candles[L].low <= lower2[L] && stK < 25) {
@@ -594,7 +594,7 @@ const STRATEGIES = [
         if (revCandle) {
           const sl = Math.min(lower2[L] - atr * 0.5, price - atr * 0.3);
           if (lower1[L] <= price) return null; // TP1 must be above entry for longs
-          return {dir:'long', conf:68, entry:price, sl, tp1:lower1[L], tp2:vwap[L], reason:'Price at lower 2σ VWAP band with oversold StochRSI — mean reversion long'};
+          return {dir:'long', conf:62, entry:price, sl, tp1:lower1[L], tp2:vwap[L], reason:'Price at lower 2σ VWAP band with oversold StochRSI — mean reversion long'};
         }
       }
       return null;
@@ -665,12 +665,12 @@ const STRATEGIES = [
       // Bullish divergence: price lower low, RSI higher low
       if (recentLow1 && recentLow2 && recentLow1.price < recentLow2.price && recentLow1.rsi > recentLow2.rsi && ind.rsi[L] < 45) {
         const bullCandle = candles[L].close > candles[L].open;
-        if (bullCandle) return {dir:'long', conf:74, entry:price, sl:recentLow1.price - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish RSI divergence — price made lower low but RSI made higher low'};
+        if (bullCandle) return {dir:'long', conf:66, entry:price, sl:recentLow1.price - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish RSI divergence — price made lower low but RSI made higher low'};
       }
       // Bearish divergence: price higher high, RSI lower high
       if (recentHigh1 && recentHigh2 && recentHigh1.price > recentHigh2.price && recentHigh1.rsi < recentHigh2.rsi && ind.rsi[L] > 55) {
         const bearCandle = candles[L].close < candles[L].open;
-        if (bearCandle) return {dir:'short', conf:74, entry:price, sl:recentHigh1.price + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish RSI divergence — price made higher high but RSI made lower high'};
+        if (bearCandle) return {dir:'short', conf:66, entry:price, sl:recentHigh1.price + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish RSI divergence — price made higher high but RSI made lower high'};
       }
       return null;
     }
@@ -703,10 +703,10 @@ const STRATEGIES = [
       const avgVol = candles.slice(L - 20, L).reduce((s, c) => s + c.volume, 0) / 20;
       const highVol = candles[L].volume > avgVol;
       if (closeAboveUpper && highVol) {
-        return {dir:'long', conf:76, entry:price, sl:ind.bb.middle[L], tp1:price + (ind.bb.upper[L] - ind.bb.lower[L]) * 1.5, tp2:price + (ind.bb.upper[L] - ind.bb.lower[L]) * 2, reason:'Bollinger Squeeze breakout to the upside with volume confirmation'};
+        return {dir:'long', conf:62, entry:price, sl:ind.bb.middle[L], tp1:price + (ind.bb.upper[L] - ind.bb.lower[L]) * 1.5, tp2:price + (ind.bb.upper[L] - ind.bb.lower[L]) * 2, reason:'Bollinger Squeeze breakout to the upside with volume confirmation'};
       }
       if (closeBelowLower && highVol) {
-        return {dir:'short', conf:76, entry:price, sl:ind.bb.middle[L], tp1:price - (ind.bb.upper[L] - ind.bb.lower[L]) * 1.5, tp2:price - (ind.bb.upper[L] - ind.bb.lower[L]) * 2, reason:'Bollinger Squeeze breakout to the downside with volume confirmation'};
+        return {dir:'short', conf:62, entry:price, sl:ind.bb.middle[L], tp1:price - (ind.bb.upper[L] - ind.bb.lower[L]) * 1.5, tp2:price - (ind.bb.upper[L] - ind.bb.lower[L]) * 2, reason:'Bollinger Squeeze breakout to the downside with volume confirmation'};
       }
       return null;
     }
@@ -731,11 +731,11 @@ const STRATEGIES = [
       const h = ind.macd.hist, price = candles[L].close, atr = ind.atr[L];
       // Bull reversal: histogram was negative and getting more negative, now less negative
       if (h[P2] < h[P] - 0.5 && h[P] < 0 && h[L] > h[P] && h[L] < 0) {
-        return {dir:'long', conf:62, entry:price, sl:price - atr * 1.2, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'MACD histogram reversing from negative extreme — early bullish momentum shift'};
+        return {dir:'long', conf:68, entry:price, sl:price - atr * 1.2, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'MACD histogram reversing from negative extreme — early bullish momentum shift'};
       }
       // Bear reversal: histogram was positive and growing, now shrinking
       if (h[P2] > h[P] + 0.5 && h[P] > 0 && h[L] < h[P] && h[L] > 0) {
-        return {dir:'short', conf:62, entry:price, sl:price + atr * 1.2, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'MACD histogram reversing from positive extreme — early bearish momentum shift'};
+        return {dir:'short', conf:68, entry:price, sl:price + atr * 1.2, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'MACD histogram reversing from positive extreme — early bearish momentum shift'};
       }
       return null;
     }
@@ -761,11 +761,11 @@ const STRATEGIES = [
       const price = candles[L].close, atr = ind.atr[L];
       // Bull: K crossed above D in deep oversold (< 20)
       if (kP <= dP && kL > dL && kL < 20 && candles[L].close > candles[L].open) {
-        return {dir:'long', conf:65, entry:price, sl:price - atr * 1.0, tp1:price + atr * 1.2, tp2:price + atr * 2.0, reason:'StochRSI bullish cross in deep oversold (K < 20) with bull candle'};
+        return {dir:'long', conf:72, entry:price, sl:price - atr * 1.0, tp1:price + atr * 1.2, tp2:price + atr * 2.0, reason:'StochRSI bullish cross in deep oversold (K < 20) with bull candle'};
       }
       // Bear: K crossed below D in deep overbought (> 80)
       if (kP >= dP && kL < dL && kL > 80 && candles[L].close < candles[L].open) {
-        return {dir:'short', conf:65, entry:price, sl:price + atr * 1.0, tp1:price - atr * 1.2, tp2:price - atr * 2.0, reason:'StochRSI bearish cross in deep overbought (K > 80) with bear candle'};
+        return {dir:'short', conf:72, entry:price, sl:price + atr * 1.0, tp1:price - atr * 1.2, tp2:price - atr * 2.0, reason:'StochRSI bearish cross in deep overbought (K > 80) with bear candle'};
       }
       return null;
     }
@@ -800,10 +800,10 @@ const STRATEGIES = [
         }
         if (tested) continue;
         if (ob.type === 'bull' && candles[L].close > candles[L].open) {
-          return {dir:'long', conf:68, entry:price, sl:ob.bottom - atr * 0.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price reacting at fresh bullish Order Block — institutional buy zone'};
+          return {dir:'long', conf:62, entry:price, sl:ob.bottom - atr * 0.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price reacting at fresh bullish Order Block — institutional buy zone'};
         }
         if (ob.type === 'bear' && candles[L].close < candles[L].open) {
-          return {dir:'short', conf:68, entry:price, sl:ob.top + atr * 0.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price reacting at fresh bearish Order Block — institutional sell zone'};
+          return {dir:'short', conf:62, entry:price, sl:ob.top + atr * 0.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price reacting at fresh bearish Order Block — institutional sell zone'};
         }
       }
       return null;
@@ -833,10 +833,10 @@ const STRATEGIES = [
         const inGap = price >= g.bottom && price <= g.top;
         if (!inGap) continue;
         if (g.type === 'bull' && candles[L].close > candles[L].open) {
-          return {dir:'long', conf:73, entry:price, sl:g.bottom - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price filling into bullish FVG with rejection — expecting continuation higher'};
+          return {dir:'long', conf:68, entry:price, sl:g.bottom - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Price filling into bullish FVG with rejection — expecting continuation higher'};
         }
         if (g.type === 'bear' && candles[L].close < candles[L].open) {
-          return {dir:'short', conf:73, entry:price, sl:g.top + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price filling into bearish FVG with rejection — expecting continuation lower'};
+          return {dir:'short', conf:68, entry:price, sl:g.top + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Price filling into bearish FVG with rejection — expecting continuation lower'};
         }
       }
       return null;
@@ -866,14 +866,14 @@ const STRATEGIES = [
           const moveHigh = bos.price;
           const pullbackPct = (moveHigh - price) / (moveHigh - candles[bos.i - 3]?.low || price) || 0;
           if (pullbackPct > 0.3 && pullbackPct < 0.8 && candles[L].close > candles[L].open) {
-            return {dir:'long', conf:68, entry:price, sl:price - atr * 1.5, tp1:moveHigh, tp2:moveHigh + atr * 2, reason:'Bullish BOS pullback entry — structure broken, buying the retracement'};
+            return {dir:'long', conf:62, entry:price, sl:price - atr * 1.5, tp1:moveHigh, tp2:moveHigh + atr * 2, reason:'Bullish BOS pullback entry — structure broken, buying the retracement'};
           }
         }
         if (bos.dir === 'bear') {
           const moveLow = bos.price;
           const pullbackPct = (price - moveLow) / (candles[bos.i - 3]?.high - moveLow || price) || 0;
           if (pullbackPct > 0.3 && pullbackPct < 0.8 && candles[L].close < candles[L].open) {
-            return {dir:'short', conf:68, entry:price, sl:price + atr * 1.5, tp1:moveLow, tp2:moveLow - atr * 2, reason:'Bearish BOS pullback entry — structure broken, selling the retracement'};
+            return {dir:'short', conf:62, entry:price, sl:price + atr * 1.5, tp1:moveLow, tp2:moveLow - atr * 2, reason:'Bearish BOS pullback entry — structure broken, selling the retracement'};
           }
         }
       }
@@ -909,7 +909,7 @@ const STRATEGIES = [
         if (candles[L].high > hi.price && candles[L].close < hi.price) {
           const wickRatio = (candles[L].high - candles[L].close) / (candles[L].high - candles[L].low);
           if (wickRatio > 0.6 && hasVolume) {
-            return {dir:'short', conf:65, entry:price, sl:candles[L].high + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Liquidity sweep of swing high — strong wick rejection with volume, reversal expected'};
+            return {dir:'short', conf:58, entry:price, sl:candles[L].high + atr * 0.3, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Liquidity sweep of swing high — strong wick rejection with volume, reversal expected'};
           }
         }
       }
@@ -919,7 +919,7 @@ const STRATEGIES = [
         if (candles[L].low < lo.price && candles[L].close > lo.price) {
           const wickRatio = (candles[L].close - candles[L].low) / (candles[L].high - candles[L].low);
           if (wickRatio > 0.6 && hasVolume) {
-            return {dir:'long', conf:65, entry:price, sl:candles[L].low - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Liquidity sweep of swing low — strong wick rejection with volume, reversal expected'};
+            return {dir:'long', conf:58, entry:price, sl:candles[L].low - atr * 0.3, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Liquidity sweep of swing low — strong wick rejection with volume, reversal expected'};
           }
         }
       }
@@ -953,10 +953,10 @@ const STRATEGIES = [
       const bearish = ind.ema9[L] < ind.ema21[L] && candles[L].close < candles[L].open;
       const session = isLondonKZ ? 'London' : 'New York';
       if (bullish) {
-        return {dir:'long', conf:71, entry:price, sl:price - atr * 1.0, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:`${session} Kill Zone — bullish momentum with EMA alignment`};
+        return {dir:'long', conf:60, entry:price, sl:price - atr * 1.0, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:`${session} Kill Zone — bullish momentum with EMA alignment`};
       }
       if (bearish) {
-        return {dir:'short', conf:71, entry:price, sl:price + atr * 1.0, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:`${session} Kill Zone — bearish momentum with EMA alignment`};
+        return {dir:'short', conf:60, entry:price, sl:price + atr * 1.0, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:`${session} Kill Zone — bearish momentum with EMA alignment`};
       }
       return null;
     }
@@ -995,10 +995,10 @@ const STRATEGIES = [
       const nearVwap = ind.vwap[L] && Math.abs(price - ind.vwap[L]) / price < 0.002;
       const nearEma = (ind.ema21[L] && Math.abs(price - ind.ema21[L]) / price < 0.002) || (ind.ema50[L] && Math.abs(price - ind.ema50[L]) / price < 0.002);
       const atLevel = nearVwap || nearEma;
-      if (bullEngulf && atLevel) return {dir:'long', conf:67, entry:price, sl:c.low - atr * 0.2, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish engulfing at key level — buyers overwhelmed sellers'};
-      if (bearEngulf && atLevel) return {dir:'short', conf:67, entry:price, sl:c.high + atr * 0.2, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish engulfing at key level — sellers overwhelmed buyers'};
-      if (bullPin && atLevel) return {dir:'long', conf:64, entry:price, sl:c.low - atr * 0.2, tp1:price + atr * 1.5, tp2:price + atr * 2, reason:'Bullish pin bar at key level — strong rejection of lower prices'};
-      if (bearPin && atLevel) return {dir:'short', conf:64, entry:price, sl:c.high + atr * 0.2, tp1:price - atr * 1.5, tp2:price - atr * 2, reason:'Bearish pin bar at key level — strong rejection of higher prices'};
+      if (bullEngulf && atLevel) return {dir:'long', conf:60, entry:price, sl:c.low - atr * 0.2, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish engulfing at key level — buyers overwhelmed sellers'};
+      if (bearEngulf && atLevel) return {dir:'short', conf:60, entry:price, sl:c.high + atr * 0.2, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish engulfing at key level — sellers overwhelmed buyers'};
+      if (bullPin && atLevel) return {dir:'long', conf:58, entry:price, sl:c.low - atr * 0.2, tp1:price + atr * 1.5, tp2:price + atr * 2, reason:'Bullish pin bar at key level — strong rejection of lower prices'};
+      if (bearPin && atLevel) return {dir:'short', conf:58, entry:price, sl:c.high + atr * 0.2, tp1:price - atr * 1.5, tp2:price - atr * 2, reason:'Bearish pin bar at key level — strong rejection of higher prices'};
       return null;
     }
   },
@@ -1023,10 +1023,10 @@ const STRATEGIES = [
       const recentCHOCH = smc.signals.filter(s => s.type === 'CHOCH' && s.i > L - 20 && s.i < L - 1);
       for (const ch of recentCHOCH.reverse()) {
         if (ch.dir === 'bull' && candles[L].close > candles[L].open && price < ch.price * 1.005) {
-          return {dir:'long', conf:77, entry:price, sl:price - atr * 1.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish CHOCH detected — trend reversal to upside, entering on pullback'};
+          return {dir:'long', conf:65, entry:price, sl:price - atr * 1.5, tp1:price + atr * 1.5, tp2:price + atr * 2.5, reason:'Bullish CHOCH detected — trend reversal to upside, entering on pullback'};
         }
         if (ch.dir === 'bear' && candles[L].close < candles[L].open && price > ch.price * 0.995) {
-          return {dir:'short', conf:77, entry:price, sl:price + atr * 1.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish CHOCH detected — trend reversal to downside, entering on pullback'};
+          return {dir:'short', conf:65, entry:price, sl:price + atr * 1.5, tp1:price - atr * 1.5, tp2:price - atr * 2.5, reason:'Bearish CHOCH detected — trend reversal to downside, entering on pullback'};
         }
       }
       return null;
