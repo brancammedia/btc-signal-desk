@@ -2101,8 +2101,9 @@ const SignalLog = {
     if ((setup.confidence || 0) < SIG_MIN_CONF) return 0;
     const log = this._load();
     const dir = setup.direction.toLowerCase();
-    // Dedup: don't re-log if any open trade exists in the same direction
-    const isDup = log.some(t => t.dir === dir && t.status === 'open');
+    const now = Date.now();
+    // Dedup: don't re-log if any same-direction trade is open OR was opened in last 4 hours
+    const isDup = log.some(t => t.dir === dir && (t.status === 'open' || (now - t.openTime) < 4 * 60 * 60 * 1000));
     if (isDup) return 0;
     // SL clamping: if risk-based SL is >3x wider than technical SL, use tech SL + 50% buffer
     let sl = setup.sl;
@@ -3020,12 +3021,12 @@ function App() {
     return () => { if (wsRef.current) wsRef.current.close(); };
   }, [loading]);
 
-  // Auto-log setups to Signal Performance Log
+  // Auto-log setups to Signal Performance Log (only on direction or signal change)
   useEffect(() => {
     if (!setup) return;
     const added = SignalLog.logSetup(setup, composite);
     if (added) setSignalLogData(SignalLog.getAll());
-  }, [setup?.direction, setup?.entry, setup?.confidence]);
+  }, [setup?.direction, composite?.signal]);
 
   // Check signal outcomes on each data refresh (using 15m candles)
   useEffect(() => {
