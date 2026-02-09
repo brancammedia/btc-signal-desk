@@ -1053,20 +1053,52 @@ function scanAll(allCandles) {
     if (!ind) continue;
     const smc = SMC.analyze(candles);
     results[tf] = {ind, smc, setups: []};
+    const raw = [];
     for (const strat of STRATEGIES) {
       if (DISABLED_COMBOS.has(`${strat.id}:${tf}`)) continue;
       try {
         const setup = strat.detect(ind, candles, smc);
         if (setup) {
-          // Safety: reject setups where SL is on the wrong side of entry
           if (setup.dir === 'long' && setup.sl >= setup.entry) continue;
           if (setup.dir === 'short' && setup.sl <= setup.entry) continue;
-          // Safety: reject setups where TP1 is on the wrong side of entry
           if (setup.dir === 'long' && setup.tp1 <= setup.entry) continue;
           if (setup.dir === 'short' && setup.tp1 >= setup.entry) continue;
-          results[tf].setups.push({...setup, stratId: strat.id, stratName: strat.name, tf});
+          raw.push({...setup, stratId: strat.id, stratName: strat.name, tf});
         }
       } catch {}
+    }
+    // Consolidate: group by direction, merge into one trade per direction per TF
+    const byDir = {};
+    for (const s of raw) {
+      if (!byDir[s.dir]) byDir[s.dir] = [];
+      byDir[s.dir].push(s);
+    }
+    for (const [dir, group] of Object.entries(byDir)) {
+      if (group.length === 1) {
+        results[tf].setups.push(group[0]);
+      } else {
+        // Multiple strategies agree — consolidate
+        const isLong = dir === 'long';
+        const names = group.map(s => s.stratName);
+        const ids = group.map(s => s.stratId);
+        const bestConf = Math.max(...group.map(s => s.conf));
+        // Confluence boost: +5 per extra confirming strategy, cap at 90
+        const confluenceBoost = (group.length - 1) * 5;
+        const boostedConf = Math.min(90, bestConf + confluenceBoost);
+        // Most conservative SL (closest to entry)
+        const sl = isLong ? Math.max(...group.map(s => s.sl)) : Math.min(...group.map(s => s.sl));
+        // Most conservative TP1 (closest to entry), most generous TP2
+        const tp1 = isLong ? Math.min(...group.map(s => s.tp1)) : Math.max(...group.map(s => s.tp1));
+        const tp2 = isLong ? Math.max(...group.map(s => s.tp2)) : Math.min(...group.map(s => s.tp2));
+        results[tf].setups.push({
+          dir, entry: group[0].entry, sl, tp1, tp2, tf,
+          conf: boostedConf,
+          stratId: ids.join('+'),
+          stratName: names.join(' + '),
+          reason: `${group.length}x confluence (${names.join(', ')}) — ${group[0].reason}`,
+          confluenceCount: group.length,
+        });
+      }
     }
   }
   return results;
@@ -1079,13 +1111,14 @@ function getBestSetups(scanResults, maxSetups = 5) {
       for (const s of scanResults[tf].setups) all.push({...s, weight: TF_WEIGHTS[tf] || 1});
     }
   }
-  // Score by confidence * TF weight, deduplicate by strategy
+  // Score by confidence * TF weight, deduplicate by TF+direction (already consolidated)
   all.sort((a, b) => (b.conf * b.weight) - (a.conf * a.weight));
   const seen = new Set();
   const best = [];
   for (const s of all) {
-    if (seen.has(s.stratId)) continue;
-    seen.add(s.stratId);
+    const key = `${s.tf}:${s.dir}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     best.push(s);
     if (best.length >= maxSetups) break;
   }
@@ -1268,9 +1301,10 @@ const TradeLog = {
     for (const s of setups) {
       if (s.conf < LOG_MIN_CONF) continue; // skip low-confidence signals
       if (s.dir !== dominantDir) continue; // skip signals opposing the dominant direction
+      // Dedup by TF+direction: don't re-log if same TF+dir is open or was logged within dedup window
       const isDup = log.some(t =>
-        t.stratId === s.stratId && t.tf === s.tf && t.dir === s.dir &&
-        t.status === 'open' && (now - t.openTime) < LOG_DEDUP_MS
+        t.tf === s.tf && t.dir === s.dir &&
+        (t.status === 'open' || (now - t.openTime) < LOG_DEDUP_MS)
       );
       if (isDup) continue;
       log.push({
@@ -1635,11 +1669,12 @@ function StrategyScannerGrid({scanResults}) {
             <React.Fragment key={strat.id}>
               <div className="scanner-label">{strat.name}</div>
               {TIMEFRAMES.map(tf => {
-                const setup = scanResults[tf]?.setups?.find(s => s.stratId === strat.id);
+                const setup = scanResults[tf]?.setups?.find(s => s.stratId === strat.id || s.stratId.split('+').includes(strat.id));
+                const isConfluence = setup && setup.confluenceCount > 1;
                 return (
                   <div key={tf} className="scanner-cell">
                     {setup ? (
-                      <span className="scanner-dot" style={{background: setup.dir === 'long' ? 'var(--bull)' : 'var(--bear)', boxShadow: `0 0 6px ${setup.dir === 'long' ? 'var(--bull)' : 'var(--bear)'}`}} title={`${setup.dir.toUpperCase()} — ${setup.conf}% confidence`} />
+                      <span className="scanner-dot" style={{background: setup.dir === 'long' ? 'var(--bull)' : 'var(--bear)', boxShadow: `0 0 ${isConfluence?'10px':'6px'} ${setup.dir === 'long' ? 'var(--bull)' : 'var(--bear)'}`, transform: isConfluence?'scale(1.3)':''}} title={`${setup.dir.toUpperCase()} — ${setup.conf}%${isConfluence?' ('+setup.confluenceCount+'x confluence)':''}`} />
                     ) : (
                       <span className="scanner-dot" style={{background:'var(--border)'}} />
                     )}
@@ -1882,7 +1917,7 @@ function StrategyPlaybook({scanResults}) {
         {filtered.map(strat => {
           const isOpen = openId === strat.id;
           // Check if this strategy is currently active
-          const activeCount = Object.values(scanResults).reduce((n, r) => n + (r.setups?.some(s => s.stratId === strat.id) ? 1 : 0), 0);
+          const activeCount = Object.values(scanResults).reduce((n, r) => n + (r.setups?.some(s => s.stratId === strat.id || s.stratId.split('+').includes(strat.id)) ? 1 : 0), 0);
           return (
             <div key={strat.id} className="strat-card">
               <div className="strat-head" onClick={() => setOpenId(isOpen ? null : strat.id)}>
