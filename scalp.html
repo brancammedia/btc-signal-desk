@@ -204,6 +204,10 @@ td{padding:4px 8px;border-bottom:1px solid rgba(30,41,59,0.4);font-size:13px;whi
   .input{width:100%;font-size:12px;}
   .session-pill .s-timer{display:none;}
 }
+.btt{position:fixed;bottom:24px;right:24px;z-index:9999;width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:20px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4);}
+.btt.vis{opacity:.7;pointer-events:auto;}
+.btt:hover{opacity:1;background:var(--accent);color:#fff;}
+@media(max-width:768px){.btt{width:36px;height:36px;font-size:16px;bottom:16px;right:16px;}}
 </style>
 </head>
 <body>
@@ -2405,6 +2409,16 @@ function TradeLogPanel({log, onClear, onImport, tradeCapital, userLev}) {
 // ═══════════════════════════════════════════════════════════════
 // APP
 // ═══════════════════════════════════════════════════════════════
+function BackToTop() {
+  const [vis, setVis] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setVis(window.scrollY > 400);
+    window.addEventListener('scroll', onScroll, {passive:true});
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  return <button className={'btt' + (vis?' vis':'')} onClick={() => window.scrollTo({top:0,behavior:'smooth'})} aria-label="Back to top">{'\u2191'}</button>;
+}
+
 function App() {
   const [status, setStatus] = useState('Initializing...');
   const [data, setData] = useState(null);
@@ -2521,6 +2535,7 @@ function App() {
         BTC Scalp Lab — Real-time scalp trading education & signals. Data from Binance. Refreshes every {REFRESH_MS/1000}s.
         <br/>Not financial advice. Trade at your own risk. <a href="index.html" style={{color:'var(--accent)'}}>Back to Signal Desk</a>
       </div>
+      <BackToTop />
     </div>
   );
 }
