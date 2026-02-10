@@ -2102,6 +2102,9 @@ const SignalLog = {
     const log = this._load();
     const dir = setup.direction.toLowerCase();
     const now = Date.now();
+    // Cooldown: no new trade of ANY direction within 30 min of last logged trade
+    const recentAny = log.some(t => (now - t.openTime) < 30 * 60 * 1000);
+    if (recentAny) return 0;
     // Dedup: don't re-log if any same-direction trade is open OR was opened in last 4 hours
     const isDup = log.some(t => t.dir === dir && (t.status === 'open' || (now - t.openTime) < 4 * 60 * 60 * 1000));
     if (isDup) return 0;
@@ -2928,6 +2931,7 @@ function App() {
 
   // Signal performance log (auto-tracking)
   const [signalLogData, setSignalLogData] = useState(() => SignalLog.getAll());
+  const lastLoggedSignal = useRef(null);
   useEffect(() => { SignalLog.restore().then(log => { if (log.length > 0 && signalLogData.length === 0) setSignalLogData(log); }); }, []);
 
   const wsRef = useRef(null);
@@ -3021,11 +3025,16 @@ function App() {
     return () => { if (wsRef.current) wsRef.current.close(); };
   }, [loading]);
 
-  // Auto-log setups to Signal Performance Log (only on direction or signal change)
+  // Auto-log setups to Signal Performance Log (only on genuine signal change)
   useEffect(() => {
     if (!setup) return;
+    const key = `${setup.direction}_${composite?.signal}`;
+    if (key === lastLoggedSignal.current) return; // skip if signal hasn't truly changed
     const added = SignalLog.logSetup(setup, composite);
-    if (added) setSignalLogData(SignalLog.getAll());
+    if (added) {
+      lastLoggedSignal.current = key;
+      setSignalLogData(SignalLog.getAll());
+    }
   }, [setup?.direction, composite?.signal]);
 
   // Check signal outcomes on each data refresh (using 15m candles)
