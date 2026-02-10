@@ -1042,7 +1042,7 @@ const STRATEGIES = [
 // STRATEGY SCANNER — runs all strategies on all timeframes
 // ═══════════════════════════════════════════════════════════════
 // TF-strategy combos disabled based on performance data (net negative P&L with sufficient sample)
-const DISABLED_COMBOS = new Set(['bos-pullback:15m', 'ema-cross:15m']);
+const DISABLED_COMBOS = new Set(['bos-continuation:15m', 'ema-cross:15m']);
 
 function scanAll(allCandles) {
   const results = {};
