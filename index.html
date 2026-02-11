@@ -2327,9 +2327,12 @@ function SignalLogPanel({log, onClear, onImport, tradeCapital, userLev}) {
 
         {displayed.length > 0 ? (
           <div style={{overflowX:'auto'}}>
-            <table><thead><tr><th>Time</th><th>Dir</th><th>Conf</th><th>Score</th><th>Entry</th><th>SL</th><th>TP1</th><th>Status</th><th>P&L %</th><th>$ P&L</th></tr></thead>
+            <table><thead><tr><th>Time</th><th>Dir</th><th>Conf</th><th>Score</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>TP3</th><th>Status</th><th>P&L %</th><th>$ P&L</th></tr></thead>
             <tbody>{displayed.map(t => {
               const dp = calcDollarPnl(t);
+              const tp1Style = t.status==='win-tp1'||t.status==='win-tp2'||t.status==='win-tp3' ? {fontWeight:700,color:'var(--bull)'} : {};
+              const tp2Style = t.status==='win-tp2'||t.status==='win-tp3' ? {fontWeight:700,color:'var(--bull)'} : {color:'var(--muted)'};
+              const tp3Style = t.status==='win-tp3' ? {fontWeight:700,color:'var(--bull)'} : {color:'var(--muted)'};
               return (<tr key={t.id} style={{background:t.status.startsWith('win')?'var(--bull-bg)':t.status==='loss'?'var(--bear-bg)':'transparent'}}>
                 <td style={{fontSize:10,whiteSpace:'nowrap'}}>{fmtTime(t.openTime)}</td>
                 <td><span className={`badge ${t.dir==='long'?'badge-bull':'badge-bear'}`} style={{fontSize:9}}>{t.dir.toUpperCase()}</span></td>
@@ -2337,7 +2340,9 @@ function SignalLogPanel({log, onClear, onImport, tradeCapital, userLev}) {
                 <td style={{fontWeight:600,color:t.composite>0?'var(--bull)':t.composite<0?'var(--bear)':'var(--muted)'}}>{t.composite>0?'+':''}{t.composite}</td>
                 <td>{fmtP(t.entry)}</td>
                 <td className="bear">{fmtP(t.sl)}</td>
-                <td className="bull">{fmtP(t.tp1)}</td>
+                <td style={tp1Style}>{fmtP(t.tp1)}</td>
+                <td style={tp2Style}>{t.tp2 ? fmtP(t.tp2) : '—'}</td>
+                <td style={tp3Style}>{t.tp3 ? fmtP(t.tp3) : '—'}</td>
                 <td>{statusBadge(t.status)}</td>
                 <td className={t.pnlPct>0?'bull':t.pnlPct<0?'bear':'muted'} style={{fontWeight:600}}>{t.pnlPct!=null?`${t.pnlPct>0?'+':''}${t.pnlPct.toFixed(3)}%`:'—'}</td>
                 <td className={dp>0?'bull':dp<0?'bear':'muted'} style={{fontWeight:700}}>{dp!=null?`${dp>0?'+':'-'}$${Math.abs(dp).toFixed(2)}`:'—'}</td>
@@ -3030,12 +3035,20 @@ function App() {
     if (!setup) return;
     const key = `${setup.direction}_${composite?.signal}`;
     if (key === lastLoggedSignal.current) return; // skip if signal hasn't truly changed
+    // Staleness guard: reject if setup.entry diverges >1.5% from live WS price
+    if (livePrice && setup.entry) {
+      const divergence = Math.abs(setup.entry - livePrice) / livePrice * 100;
+      if (divergence > 1.5) {
+        console.warn(`[SignalLog] SKIPPED stale entry: setup.entry=$${setup.entry.toFixed(2)} vs livePrice=$${livePrice.toFixed(2)} (${divergence.toFixed(2)}% divergence)`);
+        return;
+      }
+    }
     const added = SignalLog.logSetup(setup, composite);
     if (added) {
       lastLoggedSignal.current = key;
       setSignalLogData(SignalLog.getAll());
     }
-  }, [setup?.direction, composite?.signal]);
+  }, [setup?.direction, composite?.signal, livePrice]);
 
   // Check signal outcomes on each data refresh (using 15m candles)
   useEffect(() => {

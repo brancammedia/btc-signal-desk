@@ -2416,6 +2416,7 @@ function TradeLogPanel({log, onClear, onImport, tradeCapital, userLev}) {
                   <th>Entry</th>
                   <th>SL</th>
                   <th>TP1</th>
+                  <th>TP2</th>
                   <th>Status</th>
                   <th>P&L %</th>
                   <th>$ P&L</th>
@@ -2433,7 +2434,8 @@ function TradeLogPanel({log, onClear, onImport, tradeCapital, userLev}) {
                       <td>{confBar(t.conf)}</td>
                       <td>${t.entry?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
                       <td className="bear">${t.sl?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
-                      <td className="bull">${t.tp1?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+                      <td style={t.status==='win-tp1'||t.status==='win-tp2' ? {fontWeight:700,color:'var(--bull)'} : {color:'var(--bull)'}}>${t.tp1?.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+                      <td style={t.status==='win-tp2' ? {fontWeight:700,color:'var(--bull)'} : {color:'var(--muted)'}}>{t.tp2 ? `$${t.tp2.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}` : '—'}</td>
                       <td>{statusBadge(t.status)}</td>
                       <td className={t.pnlPct > 0 ? 'bull' : t.pnlPct < 0 ? 'bear' : 'muted'} style={{fontWeight:600}}>
                         {t.pnlPct != null ? `${t.pnlPct > 0 ? '+' : ''}${t.pnlPct.toFixed(3)}%` : '—'}
