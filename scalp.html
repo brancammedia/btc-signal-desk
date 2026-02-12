@@ -1643,7 +1643,7 @@ function Header({ticker, livePrice, tradeStats}) {
           <span style={{color:'var(--muted)'}}>|</span>
           <span style={{color:'var(--text)'}}>{s.winRate.toFixed(1)}%</span>
           <span style={{color:'var(--muted)'}}>|</span>
-          <span style={{color: s.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)', fontWeight:700}}>${s.totalDollar >= 0 ? '+' : ''}{s.totalDollar.toFixed(2)}</span>
+          <span style={{color: s.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)', fontWeight:700}}>{s.totalDollar >= 0 ? '+$' : '-$'}{Math.abs(s.totalDollar).toFixed(2)}</span>
           {s.open > 0 && <span style={{color:'var(--accent)',fontSize:10}}>({s.open} open)</span>}
         </div>
       )}
@@ -2706,7 +2706,7 @@ function App() {
           </div>
           <div style={{textAlign:'center',padding:'2px 10px'}}>
             <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Total $ P&L</div>
-            <div style={{fontSize:16,fontWeight:700,color: headerStats.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)',fontFamily:'JetBrains Mono'}}>{headerStats.totalDollar >= 0 ? '+' : ''}${headerStats.totalDollar.toFixed(2)}</div>
+            <div style={{fontSize:16,fontWeight:700,color: headerStats.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)',fontFamily:'JetBrains Mono'}}>{headerStats.totalDollar >= 0 ? '+$' : '-$'}{Math.abs(headerStats.totalDollar).toFixed(2)}</div>
           </div>
           <div style={{width:1,height:30,background:'var(--border)'}}></div>
           <div style={{textAlign:'center',padding:'2px 10px'}}>
