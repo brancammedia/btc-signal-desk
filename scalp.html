@@ -458,23 +458,29 @@ const SMC = {
   bos_choch(candles, swings) {
     const signals = [];
     const {highs, lows} = swings;
+    // Interleave highs and lows by candle index for correct chronological processing
+    const events = [
+      ...highs.map(h => ({...h, kind: 'high'})),
+      ...lows.map(l => ({...l, kind: 'low'}))
+    ].sort((a, b) => a.i - b.i);
     let trend = 0; // 1=up, -1=down
     let lastHH = null, lastLL = null;
-    for (let i = 1; i < highs.length; i++) {
-      if (lastHH && highs[i].price > lastHH.price) {
-        if (trend === 1) signals.push({type:'BOS', dir:'bull', i: highs[i].i, price: highs[i].price});
-        else { signals.push({type:'CHOCH', dir:'bull', i: highs[i].i, price: highs[i].price}); trend = 1; }
+    for (const ev of events) {
+      if (ev.kind === 'high') {
+        if (lastHH && ev.price > lastHH.price) {
+          if (trend === 1) signals.push({type:'BOS', dir:'bull', i: ev.i, price: ev.price});
+          else { signals.push({type:'CHOCH', dir:'bull', i: ev.i, price: ev.price}); trend = 1; }
+        }
+        lastHH = ev;
+      } else {
+        if (lastLL && ev.price < lastLL.price) {
+          if (trend === -1) signals.push({type:'BOS', dir:'bear', i: ev.i, price: ev.price});
+          else { signals.push({type:'CHOCH', dir:'bear', i: ev.i, price: ev.price}); trend = -1; }
+        }
+        lastLL = ev;
       }
-      lastHH = highs[i];
     }
-    for (let i = 1; i < lows.length; i++) {
-      if (lastLL && lows[i].price < lastLL.price) {
-        if (trend === -1) signals.push({type:'BOS', dir:'bear', i: lows[i].i, price: lows[i].price});
-        else { signals.push({type:'CHOCH', dir:'bear', i: lows[i].i, price: lows[i].price}); trend = -1; }
-      }
-      lastLL = lows[i];
-    }
-    return signals.sort((a, b) => a.i - b.i);
+    return signals;
   },
   fvgs(candles) {
     const gaps = [];
@@ -760,7 +766,7 @@ const STRATEGIES = [
     mistakes: ['Entering just because StochRSI is extreme (it can stay extreme in trends)', 'Not waiting for the actual cross', 'Using StochRSI alone without price action confirmation'],
     detect(ind, candles, smc) {
       const L = candles.length - 1, P = L - 1;
-      if (!ind.stochRsi.k[L] || !ind.stochRsi.d[L] || !ind.stochRsi.k[P] || !ind.stochRsi.d[P] || !ind.atr[L]) return null;
+      if (ind.stochRsi.k[L] == null || ind.stochRsi.d[L] == null || ind.stochRsi.k[P] == null || ind.stochRsi.d[P] == null || !ind.atr[L]) return null;
       const kL = ind.stochRsi.k[L], dL = ind.stochRsi.d[L], kP = ind.stochRsi.k[P], dP = ind.stochRsi.d[P];
       const price = candles[L].close, atr = ind.atr[L];
       // Bull: K crossed above D in deep oversold (< 20)
