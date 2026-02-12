@@ -2643,20 +2643,6 @@ function App() {
     setTradeLogData(TradeLog.getAll());
   }, []);
 
-  if (error) return (
-    <div>
-      <Header ticker={null} livePrice={null} />
-      <div className="error-box">Error: {error}. Retrying in {REFRESH_MS/1000}s...</div>
-    </div>
-  );
-
-  if (!data) return (
-    <div>
-      <Header ticker={null} livePrice={null} />
-      <div className="loading"><div className="pulse" style={{fontSize:24,marginBottom:12}}>Loading BTCUSDT Data...</div><div>{status}</div></div>
-    </div>
-  );
-
   const headerStats = useMemo(() => {
     const log = tradeLogData || [];
     const closed = log.filter(t => t.status !== 'open');
@@ -2676,6 +2662,20 @@ function App() {
     const avgLossPct = lossTrades.length > 0 ? lossTrades.reduce((s, t) => s + (t.pnlPct || 0), 0) / lossTrades.length : 0;
     return { total: closed.length, open: log.filter(t => t.status === 'open').length, wins: winTrades.length, losses: lossTrades.length, winRate: decided > 0 ? winTrades.length / decided * 100 : 0, totalDollar, totalPnlPct, avgWinPct, avgLossPct };
   }, [tradeLogData, tradeCapital, userLev]);
+
+  if (error) return (
+    <div>
+      <Header ticker={null} livePrice={null} />
+      <div className="error-box">Error: {error}. Retrying in {REFRESH_MS/1000}s...</div>
+    </div>
+  );
+
+  if (!data) return (
+    <div>
+      <Header ticker={null} livePrice={null} />
+      <div className="loading"><div className="pulse" style={{fontSize:24,marginBottom:12}}>Loading BTCUSDT Data...</div><div>{status}</div></div>
+    </div>
+  );
 
   return (
     <div>
