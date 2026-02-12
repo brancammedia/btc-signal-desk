@@ -1641,9 +1641,9 @@ function Header({ticker, livePrice, tradeStats}) {
           <span style={{color:'var(--bull)'}}>{s.wins}W</span>
           <span style={{color:'var(--bear)'}}>{s.losses}L</span>
           <span style={{color:'var(--muted)'}}>|</span>
-          <span style={{color:'var(--text)'}}>{s.winRate.toFixed(1)}%</span>
+          <span style={{color:'var(--warn)'}}><span style={{color:'var(--muted)',fontSize:10}}>WR </span>{s.winRate.toFixed(1)}%</span>
           <span style={{color:'var(--muted)'}}>|</span>
-          <span style={{color: s.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)', fontWeight:700}}>{s.totalDollar >= 0 ? '+$' : '-$'}{Math.abs(s.totalDollar).toFixed(2)}</span>
+          <span style={{color: s.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)', fontWeight:700}}><span style={{color:'var(--muted)',fontSize:10}}>P&L </span>{s.totalDollar >= 0 ? '+$' : '-$'}{Math.abs(s.totalDollar).toFixed(2)}</span>
           {s.open > 0 && <span style={{color:'var(--accent)',fontSize:10}}>({s.open} open)</span>}
         </div>
       )}
