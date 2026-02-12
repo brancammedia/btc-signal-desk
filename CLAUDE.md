@@ -110,6 +110,12 @@ Single-file HTML application (`index.html`) for real-time Bitcoin technical anal
   - Technical SL shown as faded reference row when different
   - Warning when risk SL is tighter than technical level
   - Leverage comparison table per setup (1x/3x/5x/10x)
+- **Confidence & SL Rebalance** (Feb 12 — based on 3-day log analysis):
+  - Within-TF strat bonus: +5% → +2% per extra strategy (overlap ≠ independent confirmation)
+  - Within-TF cap: 90 → 82
+  - Cross-TF cap: 92 → 85 (cross-TF boost kept at +3%, that's real confirmation)
+  - SL selection FLIPPED: now uses WIDEST SL (most room) instead of tightest (was causing noise stops)
+  - Rationale: 80%+ trades were 25% WR, -$28 over 3 days. 70-79% was 48.5% WR, +$301. Tighter SLs on high-confluence trades were getting stopped before thesis played out.
 - **Strategy Detection Tuning** (post-overnight test):
   - EMA MACD filter: requires BOTH positive AND growing histogram
   - StochRSI: thresholds tightened to 20/80, requires confirmation candle
