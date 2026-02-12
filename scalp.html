@@ -2677,6 +2677,53 @@ function App() {
   return (
     <div>
       <Header ticker={data.ticker} livePrice={livePrice} tradeStats={headerStats} />
+      {headerStats.total > 0 && (() => {
+        const s = headerStats;
+        const closed = (tradeLogData || []).filter(t => t.status !== 'open');
+        const posUSD = tradeCapital * Math.max(1, userLev);
+        const avgWinPct = s.wins > 0 ? closed.filter(t => t.status?.startsWith?.('win')).reduce((sum,t) => sum + (t.pnlPct||0), 0) / s.wins : 0;
+        const avgLossPct = s.losses > 0 ? closed.filter(t => t.status === 'loss').reduce((sum,t) => sum + (t.pnlPct||0), 0) / s.losses : 0;
+        const totalPnlPct = closed.reduce((sum,t) => sum + (t.pnlPct||0), 0);
+        return (
+          <div style={{display:'flex',gap:10,padding:'8px 12px',background:'var(--card)',borderBottom:'1px solid var(--border)',flexWrap:'wrap',justifyContent:'center',alignItems:'center'}}>
+            <div style={{textAlign:'center',padding:'2px 10px'}}>
+              <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Open</div>
+              <div style={{fontSize:16,fontWeight:700,color:'var(--accent)',fontFamily:'JetBrains Mono'}}>{s.open}</div>
+            </div>
+            <div style={{textAlign:'center',padding:'2px 10px'}}>
+              <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Wins</div>
+              <div style={{fontSize:16,fontWeight:700,color:'var(--bull)',fontFamily:'JetBrains Mono'}}>{s.wins}</div>
+            </div>
+            <div style={{textAlign:'center',padding:'2px 10px'}}>
+              <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Losses</div>
+              <div style={{fontSize:16,fontWeight:700,color:'var(--bear)',fontFamily:'JetBrains Mono'}}>{s.losses}</div>
+            </div>
+            <div style={{width:1,height:30,background:'var(--border)'}}></div>
+            <div style={{textAlign:'center',padding:'2px 10px'}}>
+              <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Win Rate</div>
+              <div style={{fontSize:16,fontWeight:700,color: s.winRate >= 50 ? 'var(--bull)' : s.winRate >= 40 ? 'var(--warn)' : 'var(--bear)',fontFamily:'JetBrains Mono'}}>{s.winRate.toFixed(1)}%</div>
+            </div>
+            <div style={{width:1,height:30,background:'var(--border)'}}></div>
+            <div style={{textAlign:'center',padding:'2px 10px'}}>
+              <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Total P&L %</div>
+              <div style={{fontSize:16,fontWeight:700,color: totalPnlPct >= 0 ? 'var(--bull)' : 'var(--bear)',fontFamily:'JetBrains Mono'}}>{totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%</div>
+            </div>
+            <div style={{textAlign:'center',padding:'2px 10px'}}>
+              <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Total $ P&L</div>
+              <div style={{fontSize:16,fontWeight:700,color: s.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)',fontFamily:'JetBrains Mono'}}>{s.totalDollar >= 0 ? '+' : ''}${s.totalDollar.toFixed(2)}</div>
+            </div>
+            <div style={{width:1,height:30,background:'var(--border)'}}></div>
+            <div style={{textAlign:'center',padding:'2px 10px'}}>
+              <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Avg Win</div>
+              <div style={{fontSize:14,fontWeight:600,color:'var(--bull)',fontFamily:'JetBrains Mono'}}>{avgWinPct >= 0 ? '+' : ''}{avgWinPct.toFixed(3)}%</div>
+            </div>
+            <div style={{textAlign:'center',padding:'2px 10px'}}>
+              <div style={{fontSize:10,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px'}}>Avg Loss</div>
+              <div style={{fontSize:14,fontWeight:600,color:'var(--bear)',fontFamily:'JetBrains Mono'}}>{avgLossPct.toFixed(3)}%</div>
+            </div>
+          </div>
+        );
+      })()}
       <div className="main-grid">
         <div className="col-left">
           <ScalpChart candles={data.candles} scanResults={scanResults} selectedTF={selectedTF} onTFChange={setSelectedTF} />
