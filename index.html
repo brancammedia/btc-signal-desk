@@ -1269,7 +1269,8 @@ function Tip({k}) {
 // ═══════════════════════════════════════════════════════════════
 
 // ── Header ──
-function Header({livePrice, change24h, lastRefresh, onRefresh}) {
+function Header({livePrice, change24h, lastRefresh, onRefresh, tradeStats}) {
+  const s = tradeStats || {};
   const [sessionInfo, setSessionInfo] = useState(getSessionInfo);
   useEffect(() => {
     const id = setInterval(() => setSessionInfo(getSessionInfo()), 1000);
@@ -1297,6 +1298,17 @@ function Header({livePrice, change24h, lastRefresh, onRefresh}) {
           </div>
         ))}
       </div>
+      {s.total > 0 && (
+        <div style={{display:'flex',gap:8,alignItems:'center',marginLeft:8,padding:'3px 10px',background:'rgba(17,24,39,0.8)',border:'1px solid var(--border)',borderRadius:6,fontSize:12,fontFamily:'JetBrains Mono'}}>
+          <span style={{color:'var(--bull)'}}>{s.wins}W</span>
+          <span style={{color:'var(--bear)'}}>{s.losses}L</span>
+          <span style={{color:'var(--muted)'}}>|</span>
+          <span style={{color:'var(--warn)'}}><span style={{color:'var(--muted)',fontSize:10}}>WR </span>{s.winRate.toFixed(1)}%</span>
+          <span style={{color:'var(--muted)'}}>|</span>
+          <span style={{color: s.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)', fontWeight:700}}><span style={{color:'var(--muted)',fontSize:10}}>P&L </span>{s.totalDollar >= 0 ? '+$' : '-$'}{Math.abs(s.totalDollar).toFixed(2)}</span>
+          {s.open > 0 && <span style={{color:'var(--accent)',fontSize:10}}>({s.open} open)</span>}
+        </div>
+      )}
       <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,fontSize:11,color:'var(--muted)'}}>
         <a href="scalp.html" style={{color:'var(--warn)',textDecoration:'none',fontWeight:600,fontSize:12}}>Scalp Lab</a>
         {lastRefresh && <span>Updated {lastRefresh.toLocaleTimeString()}</span>}
@@ -3065,16 +3077,33 @@ function App() {
 
   const change24h = ticker ? +ticker.priceChangePercent : null;
 
+  const signalStats = useMemo(() => {
+    const log = signalLogData || [];
+    const closed = log.filter(t => t.status !== 'open');
+    const winTrades = closed.filter(t => t.status && t.status.startsWith('win'));
+    const lossTrades = closed.filter(t => t.status === 'loss');
+    const posUSD = tradeCapital * Math.max(1, userLev);
+    const calcPnl = (t) => {
+      if (t.pnlPct == null || !t.entry) return 0;
+      const posBTC = posUSD / t.entry;
+      const priceDiff = t.closePrice ? Math.abs(t.closePrice - t.entry) : 0;
+      return (t.pnlPct >= 0 ? 1 : -1) * posBTC * priceDiff;
+    };
+    const totalDollar = closed.reduce((sum, t) => sum + calcPnl(t), 0);
+    const decided = winTrades.length + lossTrades.length;
+    return { total: closed.length, open: log.filter(t => t.status === 'open').length, wins: winTrades.length, losses: lossTrades.length, winRate: decided > 0 ? winTrades.length / decided * 100 : 0, totalDollar };
+  }, [signalLogData, tradeCapital, userLev]);
+
   if (loading) return (
     <div>
-      <Header livePrice={null} change24h={null} lastRefresh={null} onRefresh={refresh} />
+      <Header livePrice={null} change24h={null} lastRefresh={null} onRefresh={refresh} tradeStats={signalStats} />
       <div className="loading pulse" style={{marginTop:60}}>{status}</div>
     </div>
   );
 
   return (
     <div>
-      <Header livePrice={livePrice} change24h={change24h} lastRefresh={lastRefresh} onRefresh={refresh} />
+      <Header livePrice={livePrice} change24h={change24h} lastRefresh={lastRefresh} onRefresh={refresh} tradeStats={signalStats} />
       {error && <div className="error-box">{error}</div>}
 
       <div className="main-grid">
