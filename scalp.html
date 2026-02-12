@@ -1645,6 +1645,7 @@ function Header({ticker, livePrice, tradeStats}) {
           <span style={{color:'var(--muted)'}}>|</span>
           <span style={{color: s.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)', fontWeight:700}}><span style={{color:'var(--muted)',fontSize:10}}>P&L </span>{s.totalDollar >= 0 ? '+$' : '-$'}{Math.abs(s.totalDollar).toFixed(2)}</span>
           {s.open > 0 && <span style={{color:'var(--accent)',fontSize:10}}>({s.open} open)</span>}
+          {s.timeSpan && <span style={{color:'var(--muted)',fontSize:10}}>over {s.timeSpan}</span>}
         </div>
       )}
       <div style={{display:'flex',gap:6,marginLeft:'auto',flexWrap:'wrap'}}>
@@ -2660,7 +2661,24 @@ function App() {
     const totalPnlPct = closed.reduce((s, t) => s + (t.pnlPct || 0), 0);
     const avgWinPct = winTrades.length > 0 ? winTrades.reduce((s, t) => s + (t.pnlPct || 0), 0) / winTrades.length : 0;
     const avgLossPct = lossTrades.length > 0 ? lossTrades.reduce((s, t) => s + (t.pnlPct || 0), 0) / lossTrades.length : 0;
-    return { total: closed.length, open: log.filter(t => t.status === 'open').length, wins: winTrades.length, losses: lossTrades.length, winRate: decided > 0 ? winTrades.length / decided * 100 : 0, totalDollar, totalPnlPct, avgWinPct, avgLossPct };
+    // Compute time span from oldest to newest trade
+    const allTimes = log.map(t => t.openTime).filter(Boolean).sort();
+    let timeSpan = '';
+    if (allTimes.length >= 2) {
+      const ms = allTimes[allTimes.length - 1] - allTimes[0];
+      const hrs = ms / 3600000;
+      if (hrs < 1) timeSpan = Math.round(hrs * 60) + 'm';
+      else if (hrs < 24) timeSpan = hrs.toFixed(1) + 'h';
+      else if (hrs < 48) timeSpan = '1d ' + Math.round(hrs % 24) + 'h';
+      else timeSpan = Math.floor(hrs / 24) + 'd ' + Math.round(hrs % 24) + 'h';
+    } else if (allTimes.length === 1) {
+      const ms = Date.now() - allTimes[0];
+      const hrs = ms / 3600000;
+      if (hrs < 1) timeSpan = Math.round(hrs * 60) + 'm';
+      else if (hrs < 24) timeSpan = hrs.toFixed(1) + 'h';
+      else timeSpan = Math.floor(hrs / 24) + 'd';
+    }
+    return { total: closed.length, open: log.filter(t => t.status === 'open').length, wins: winTrades.length, losses: lossTrades.length, winRate: decided > 0 ? winTrades.length / decided * 100 : 0, totalDollar, totalPnlPct, avgWinPct, avgLossPct, timeSpan };
   }, [tradeLogData, tradeCapital, userLev]);
 
   if (error) return (
