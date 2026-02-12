@@ -1623,11 +1623,12 @@ function Tip({id, children}) {
 // ═══════════════════════════════════════════════════════════════
 // REACT COMPONENT: Header
 // ═══════════════════════════════════════════════════════════════
-function Header({ticker, livePrice}) {
+function Header({ticker, livePrice, tradeStats}) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   const price = livePrice || (ticker ? +ticker.lastPrice : 0);
   const change = ticker ? +ticker.priceChangePercent : 0;
+  const s = tradeStats || {};
   return (
     <div className="header">
       <h1 style={{fontFamily:'Outfit',fontSize:'20px',fontWeight:700,letterSpacing:'-0.5px',marginRight:6}}>
@@ -1635,6 +1636,17 @@ function Header({ticker, livePrice}) {
       </h1>
       {price > 0 && <span style={{fontFamily:'JetBrains Mono',fontSize:18,fontWeight:700,color:'var(--text)'}}>${price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>}
       {ticker && <span className={`badge ${change >= 0 ? 'badge-bull' : 'badge-bear'}`}>{change >= 0 ? '+' : ''}{change.toFixed(2)}%</span>}
+      {s.total > 0 && (
+        <div style={{display:'flex',gap:8,alignItems:'center',marginLeft:8,padding:'3px 10px',background:'var(--card2)',border:'1px solid var(--border)',borderRadius:6,fontSize:12,fontFamily:'JetBrains Mono'}}>
+          <span style={{color:'var(--bull)'}}>{s.wins}W</span>
+          <span style={{color:'var(--bear)'}}>{s.losses}L</span>
+          <span style={{color:'var(--muted)'}}>|</span>
+          <span style={{color:'var(--text)'}}>{s.winRate.toFixed(1)}%</span>
+          <span style={{color:'var(--muted)'}}>|</span>
+          <span style={{color: s.totalDollar >= 0 ? 'var(--bull)' : 'var(--bear)', fontWeight:700}}>${s.totalDollar >= 0 ? '+' : ''}{s.totalDollar.toFixed(2)}</span>
+          {s.open > 0 && <span style={{color:'var(--accent)',fontSize:10}}>({s.open} open)</span>}
+        </div>
+      )}
       <div style={{display:'flex',gap:6,marginLeft:'auto',flexWrap:'wrap'}}>
         {SESSIONS.map(s => {
           const info = getSessionInfo(s);
@@ -2645,9 +2657,26 @@ function App() {
     </div>
   );
 
+  const headerStats = useMemo(() => {
+    const log = tradeLogData || [];
+    const closed = log.filter(t => t.status !== 'open');
+    const wins = closed.filter(t => t.status?.startsWith?.('win'));
+    const losses = closed.filter(t => t.status === 'loss');
+    const posUSD = tradeCapital * Math.max(1, userLev);
+    const calcPnl = (t) => {
+      if (t.pnlPct == null || !t.entry) return 0;
+      const posBTC = posUSD / t.entry;
+      const priceDiff = t.closePrice ? Math.abs(t.closePrice - t.entry) : 0;
+      return (t.pnlPct >= 0 ? 1 : -1) * posBTC * priceDiff;
+    };
+    const totalDollar = closed.reduce((s, t) => s + calcPnl(t), 0);
+    const decided = wins.length + losses.length;
+    return { total: closed.length, open: log.filter(t => t.status === 'open').length, wins: wins.length, losses: losses.length, winRate: decided > 0 ? wins.length / decided * 100 : 0, totalDollar };
+  }, [tradeLogData, tradeCapital, userLev]);
+
   return (
     <div>
-      <Header ticker={data.ticker} livePrice={livePrice} />
+      <Header ticker={data.ticker} livePrice={livePrice} tradeStats={headerStats} />
       <div className="main-grid">
         <div className="col-left">
           <ScalpChart candles={data.candles} scanResults={scanResults} selectedTF={selectedTF} onTFChange={setSelectedTF} />
