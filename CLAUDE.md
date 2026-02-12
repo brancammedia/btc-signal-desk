@@ -126,6 +126,16 @@ Single-file HTML application (`index.html`) for real-time Bitcoin technical anal
 - **TF-Aware Expiry**: 1m=30min, 5m=2h, 15m=4h, 1h=8h (was flat 4h)
 - **Minimum 50 candles** for indicator warmup (was 30)
 
+## Auto-Export Server (`trade-log-server.js`)
+- Local Node.js server on `localhost:3456`
+- Receives trade log data from scalp.html via `POST /export`
+- Writes `scalp-log-YYYY-MM-DD.json` + `.xlsx` to `Trade Logs/`
+- Health check: `GET /health`
+- Start: `node trade-log-server.js` (from project root)
+- scalp.html hooks: exports every 5 min, on trade close, on page unload
+- Status indicator in Trade Log panel: green dot = connected, gray = offline
+- Silent failure — if server is down, manual export still works
+
 ## Known Considerations
 - Binance.com blocked in US — app uses api.binance.us as primary with fallbacks
 - TradingView embed widget (tv.js) does NOT support save/load — requires paid Advanced Charts library for persistence
